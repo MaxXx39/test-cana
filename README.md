@@ -58,3 +58,7 @@ Repère de la coupe : y = 0 au fond de fouille. Toutes les dimensions sont en m�
   « foisonnement » lui applique le coefficient saisi. Le remblai d’apport est le besoin en
   remblai moins les volumes réemployés, comparés en place ; au total global, les excédents
   d’un tronçon compensent les autres.
+
+Pour un environnement qui bloque téléchargements et impression (page intégrée),
+`VITE_SANS_FICHIERS=1 npm run build` masque « Enregistrer », « Export CSV » et
+« Imprimer » ; « Copier pour tableur » reste disponible.

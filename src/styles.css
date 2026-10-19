@@ -134,7 +134,7 @@ h3 {
 /* ---------- Barre ---------- */
 .barre {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 10;
   display: flex;
   flex-wrap: wrap;
@@ -1193,4 +1193,26 @@ th {
   .regard-ligne {
     grid-template-columns: minmax(0, 1fr) 76px 76px 38px 28px;
   }
+}
+
+.confirmation {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem auto 0;
+  max-width: 1000px;
+  padding: 0.75rem 1rem;
+  background: var(--alerte-fond);
+  border: 1px solid var(--alerte);
+  border-radius: 8px;
+}
+
+.confirmation p {
+  margin: 0;
+  flex: 1 1 280px;
 }

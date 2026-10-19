@@ -3,8 +3,11 @@ import type { ResultatGlobal, ResultatTroncon } from '../calc/engine';
 const nb = (v: number) => (Math.abs(v) < 1e-12 ? 0 : v).toFixed(3).replace('.', ',');
 const txt = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
-/** Export CSV (séparateur « ; », virgule décimale) pour tableur français */
-export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: ResultatGlobal): string {
+/**
+ * Export tableur (virgule décimale). Par défaut : CSV séparé par « ; » avec BOM pour Excel ;
+ * avec une tabulation, le texte se colle directement dans un tableur.
+ */
+export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: ResultatGlobal, separateur = ';'): string {
   const nomsCouches: string[] = [];
   for (const r of resultats) for (const c of r.couches) if (!nomsCouches.includes(c.nom)) nomsCouches.push(c.nom);
 
@@ -39,7 +42,7 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
       'Alertes',
     ]
       .map(txt)
-      .join(';'),
+      .join(separateur),
   );
   for (const r of resultats) {
     lignes.push(
@@ -67,7 +70,7 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
         nb(r.surfaceTete),
         nb(r.surfaceBlindage),
         txt(r.alertes.join(' | ')),
-      ].join(';'),
+      ].join(separateur),
     );
   }
   lignes.push('');
@@ -87,7 +90,7 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
     ['Emprise en tête', g.surfaceTete, 'm²'],
     ['Blindage', g.surfaceBlindage, 'm²'],
   ];
-  for (const [lib, v, u] of total) lignes.push([txt(lib), nb(v), u].join(';'));
-  // BOM pour qu'Excel détecte l'UTF-8
-  return '﻿' + lignes.join('\r\n');
+  for (const [lib, v, u] of total) lignes.push([txt(lib), nb(v), u].join(separateur));
+  // BOM pour qu'Excel détecte l'UTF-8 d'un fichier CSV
+  return (separateur === ';' ? '\ufeff' : '') + lignes.join('\r\n');
 }

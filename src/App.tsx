@@ -9,6 +9,9 @@ import { TronconEditor } from './components/TronconEditor';
 import { exportCsv } from './utils/export';
 import { fmt, telecharger } from './utils/format';
 
+/** Build pour un environnement où téléchargements et impression sont bloqués */
+const SANS_FICHIERS = import.meta.env.VITE_SANS_FICHIERS === '1';
+
 const CLE_STOCKAGE = 'calcul-tranchees:projet';
 const HISTORIQUE_MAX = 100;
 /** Les modifications rapprochées (glisser sur la coupe, frappe) forment une seule étape d'annulation */
@@ -34,6 +37,7 @@ export default function App() {
   const [mode, setMode] = useState<ModeCoupe>('moyenne');
   const [selection, setSelection] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{ texte: string; libelle: string; action: () => void } | null>(null);
   const passe = useRef<Projet[]>([]);
   const futur = useRef<Projet[]>([]);
   const derniereModif = useRef(0);
@@ -119,13 +123,27 @@ export default function App() {
 
   const majTroncon = (t: Troncon) => modifier((p) => ({ ...p, troncons: p.troncons.map((x, i) => (i === index ? t : x)) }));
 
-  const appliquerATous = () => {
-    if (!window.confirm('Appliquer la tranchée, les tuyaux, la structure et les options de ce tronçon à tous les autres tronçons ? Les longueurs sont conservées.')) return;
-    modifier((p) => ({
-      ...p,
-      troncons: p.troncons.map((t, i) => (i === index ? t : { ...dupliquerTroncon(troncon, t.longueur), id: t.id })),
-    }));
-    setMessage('Paramètres appliqués à tous les tronçons.');
+  const appliquerATous = () =>
+    setConfirmation({
+      texte: `Appliquer la tranchée, les tuyaux, la structure et les options du tronçon ${index + 1} à tous les autres tronçons ? Les longueurs sont conservées.`,
+      libelle: 'Appliquer à tous',
+      action: () => {
+        modifier((p) => ({
+          ...p,
+          troncons: p.troncons.map((t, i) => (i === index ? t : { ...dupliquerTroncon(troncon, t.longueur), id: t.id })),
+        }));
+        setMessage('Paramètres appliqués à tous les tronçons.');
+      },
+    });
+
+  const copierTableur = async () => {
+    const texte = exportCsv(projet.nom, resultats.troncons, resultats.global, '\t');
+    try {
+      await navigator.clipboard.writeText(texte);
+      setMessage('Résultats copiés : collez-les dans votre tableur.');
+    } catch {
+      setMessage('La copie a été refusée par le navigateur.');
+    }
   };
 
   const copierPrecedent = () => {
@@ -145,12 +163,15 @@ export default function App() {
     }
   };
 
-  const nouveau = () => {
-    if (!window.confirm('Créer un nouveau projet ? Le projet courant sera remplacé (pensez à l’enregistrer).')) return;
-    const p = projetExemple();
-    modifier({ ...p, nom: 'Nouveau projet' });
-    setActif(0);
-  };
+  const nouveau = () =>
+    setConfirmation({
+      texte: 'Remplacer le projet courant par un nouveau projet d’exemple ? (« Annuler » permet de revenir en arrière.)',
+      libelle: 'Nouveau projet',
+      action: () => {
+        modifier({ ...projetExemple(), nom: 'Nouveau projet' });
+        setActif(0);
+      },
+    });
 
   return (
     <div className="app">
@@ -194,25 +215,58 @@ export default function App() {
               e.target.value = '';
             }}
           />
-          <button
-            type="button"
-            className="btn btn-leger"
-            onClick={() => telecharger(nomFichier(projet.nom, 'json'), JSON.stringify(projet, null, 2), 'application/json')}
-          >
-            Enregistrer
+          {!SANS_FICHIERS && (
+            <button
+              type="button"
+              className="btn btn-leger"
+              onClick={() => telecharger(nomFichier(projet.nom, 'json'), JSON.stringify(projet, null, 2), 'application/json')}
+            >
+              Enregistrer
+            </button>
+          )}
+          <button type="button" className="btn btn-leger" onClick={() => void copierTableur()} title="Copie les résultats pour les coller dans Excel">
+            Copier pour tableur
           </button>
-          <button
-            type="button"
-            className="btn btn-primaire"
-            onClick={() => telecharger(nomFichier(projet.nom, 'csv'), exportCsv(projet.nom, resultats.troncons, resultats.global), 'text/csv;charset=utf-8')}
-          >
-            Export CSV
-          </button>
-          <button type="button" className="btn btn-leger" onClick={() => window.print()}>
-            Imprimer
-          </button>
+          {!SANS_FICHIERS && (
+            <>
+              <button
+                type="button"
+                className="btn btn-primaire"
+                onClick={() =>
+                  telecharger(nomFichier(projet.nom, 'csv'), exportCsv(projet.nom, resultats.troncons, resultats.global), 'text/csv;charset=utf-8')
+                }
+              >
+                Export CSV
+              </button>
+              <button type="button" className="btn btn-leger" onClick={() => window.print()}>
+                Imprimer
+              </button>
+            </>
+          )}
         </div>
       </header>
+
+      {confirmation && (
+        <div className="confirmation" role="alertdialog" aria-label="Confirmation">
+          <p>{confirmation.texte}</p>
+          <div className="actions">
+            <button type="button" className="btn btn-leger" onClick={() => setConfirmation(null)}>
+              Abandonner
+            </button>
+            <button
+              type="button"
+              className="btn btn-primaire"
+              autoFocus
+              onClick={() => {
+                confirmation.action();
+                setConfirmation(null);
+              }}
+            >
+              {confirmation.libelle}
+            </button>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="toast" role="status">
