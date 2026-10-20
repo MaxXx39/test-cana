@@ -58,7 +58,7 @@ function gabarit(largeur: number): Gabarit {
 
 const PAD = 8;
 const TOP = 70;
-const BAS = 84;
+const BAS = 96;
 const PAS_ETIQUETTE = 26;
 /** Champs de saisie posés sur le dessin */
 const CHAMP_L = 64;
@@ -379,6 +379,20 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
       />
     );
 
+  /** Largeur utile en fond ; une saisie passe la largeur en fixe */
+  const champLargeur = (
+    <NumberField
+      value={t.largeur}
+      onChange={(v) => onChange({ ...t, largeur: Math.max(0.1, v), largeurAuto: false })}
+      decimales={2}
+      unite="m"
+      min={0.1}
+      pas={0.05}
+      className="nf-coupe nf-type"
+      title={t.type === 'U' ? 'Largeur utile en fond, entre blindages (m)' : 'Largeur en fond (m)'}
+    />
+  );
+
   /** Valeur en lecture seule posée sur le dessin (pastille) */
   const VAL_L = 44;
   const valeur = (cle: string, x: number, y: number, v: number, titre: string): ReactNode => (
@@ -437,6 +451,36 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
         </div>
         {/* En mode compact, la largeur ajoutée ou la pente se saisit ici plutôt que sur le dessin */}
         {gab.compact && !verrouille && champTypeFouille}
+        <span className="coupe-type-titre">Surface</span>
+        <div className="segment segment-petit" role="radiogroup" aria-label="Nature du dessus">
+          {(['terre', 'enrobe'] as const).map((su) => (
+            <button
+              key={su}
+              type="button"
+              role="radio"
+              aria-checked={t.surface === su}
+              className={t.surface === su ? 'actif' : ''}
+              disabled={verrouille}
+              onClick={() => onChange({ ...t, surface: su })}
+            >
+              {su === 'terre' ? 'Terre' : 'Enrobé'}
+            </button>
+          ))}
+        </div>
+        <label className="case">
+          <input
+            type="checkbox"
+            checked={t.decapage.actif}
+            disabled={verrouille}
+            onChange={(e) => onChange({ ...t, decapage: { ...t.decapage, actif: e.target.checked } })}
+          />
+          Décapage
+        </label>
+        <label className="case" title="Largeur ajustée aux tuyaux (enrobages et écarts), tuyaux centrés">
+          <input type="checkbox" checked={t.largeurAuto} disabled={verrouille} onChange={(e) => onChange({ ...t, largeurAuto: e.target.checked })} />
+          Largeur auto
+        </label>
+        {gab.compact && !verrouille && champLargeur}
       </div>
       <svg className="coupe" viewBox={`0 0 ${VBW} ${vbh}`} role="group" aria-label="Coupe transversale de la tranchée">
         <defs>
@@ -599,13 +643,25 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           <line x1={X(-W / 2)} x2={X(W / 2)} y1={Yy(0) + 32} y2={Yy(0) + 32} />
           <line x1={X(-W / 2)} x2={X(-W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 38} />
           <line x1={X(W / 2)} x2={X(W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 38} />
-          <text x={X(0)} y={Yy(0) + 50} textAnchor="middle" className="cote-texte">
-            {epBlindage <= 0
-              ? `${fmt(W, 2)} m`
-              : gab.compact
-                ? `${fmt(W, 2)} m + 2 × ${cm(epBlindage)} cm`
-                : `${fmt(W, 2)} m utile · fouille ${fmt(Wf, 2)} m (blindage ${cm(epBlindage)} cm)`}
-          </text>
+          {gab.compact || verrouille ? (
+            <text x={X(0)} y={Yy(0) + 50} textAnchor="middle" className="cote-texte">
+              {epBlindage <= 0
+                ? `${fmt(W, 2)} m`
+                : gab.compact
+                  ? `${fmt(W, 2)} m + 2 × ${cm(epBlindage)} cm`
+                  : `${fmt(W, 2)} m utile · fouille ${fmt(Wf, 2)} m (blindage ${cm(epBlindage)} cm)`}
+            </text>
+          ) : (
+            <>
+              <foreignObject x={X(0) - 44} y={Yy(0) + 40} width={88} height={CHAMP_H} className="champ-coupe">
+                {champLargeur}
+              </foreignObject>
+              <text x={X(0) + 50} y={Yy(0) + 55} className="cote-texte">
+                {t.largeurAuto ? 'auto' : ''}
+                {epBlindage > 0 ? `${t.largeurAuto ? ' · ' : ''}fouille ${fmt(Wf, 2)} m` : ''}
+              </text>
+            </>
+          )}
           {/* Écarts nu à nu entre tuyaux voisins */}
           {tries.slice(1).map((b, i) => {
             const ga = geoms.find((g) => g.tuyau.id === tries[i].id)!;

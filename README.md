@@ -28,10 +28,11 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
    - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
      volumes ne dépendent que des profondeurs).
 3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa coupe s’ouvre à sa place, entre ses
-   deux regards (regards amont et aval compris). On y choisit la fouille en U ou en V,
-   on y saisit la largeur ajoutée de chaque côté (blindage, U) ou la pente du talus (V),
-   les épaisseurs de couches et les écarts ; les autres réglages sont repliés dessous et
-   les volumes du tronçon sont dans les résultats, avec « Dupliquer vers… » pour recopier sa
+   deux regards (regards amont et aval compris). Au-dessus de la coupe : fouille en U ou
+   en V, surface terre ou enrobé, décapage, largeur auto. Sur la coupe : largeur, blindage
+   (U) ou pente du talus (V), épaisseurs de couches, écarts. Sous la coupe : écarts entre
+   tuyaux, couches de structure et matériaux extraits. Les volumes du tronçon sont dans
+   les résultats, avec « Dupliquer vers… » pour recopier sa
    tranchée (et au choix ses tuyaux) vers d’autres tronçons. La case « Même tranchée que
    le tronçon précédent » lie un tronçon au précédent : sa tranchée type (largeur,
    blindage, surface, décapage, structure, matériaux) suit, ses tuyaux restent les siens. Les autres tronçons montrent

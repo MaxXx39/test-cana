@@ -1,6 +1,6 @@
 import type { Couche, ModeSaisie, OptionsMateriau, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
 import { changerEcart, ecartsTuyaux, nouvelleCouche, repartirTuyaux, tuyauxGaucheDroite } from '../calc/projet';
-import { filDEauRegard, largeurFouille, profondeur } from '../calc/engine';
+import { filDEauRegard } from '../calc/engine';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -86,115 +86,15 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, premie
 
   return (
     <div className="editeur">
-      <div className="editeur-longueur">
-        <NumberField label="Longueur du tronçon" value={t.longueur} onChange={(v) => maj({ longueur: v })} unite="m" min={0} pas={1} />
-      </div>
       {!premier && (
         <label className={`case bandeau-lien ${lie ? 'bandeau-lien-actif' : ''}`}>
           <input type="checkbox" checked={lie} onChange={(e) => maj({ commePrecedent: e.target.checked })} />
           <span>
             Même tranchée que le tronçon précédent
-            {lie && <small> — décochez pour la modifier ici (seuls les écarts entre tuyaux restent propres au tronçon)</small>}
+            {lie && <small> — décochez pour la modifier (seuls les écarts entre tuyaux restent propres au tronçon)</small>}
           </span>
         </label>
       )}
-      <fieldset className="bloc-form" disabled={lie}>
-        <h3>Tranchée</h3>
-        <div className="grille-champs">
-          <div className="champ">
-            <span className="champ-label">Type</span>
-            <div className="segment" role="radiogroup" aria-label="Type de tranchée">
-              <button type="button" role="radio" aria-checked={t.type === 'U'} className={t.type === 'U' ? 'actif' : ''} onClick={() => maj({ type: 'U' })}>
-                En U · blindée
-              </button>
-              <button type="button" role="radio" aria-checked={t.type === 'V'} className={t.type === 'V' ? 'actif' : ''} onClick={() => maj({ type: 'V' })}>
-                En V · talutée
-              </button>
-            </div>
-          </div>
-          <div className="champ">
-            <NumberField
-              label={t.type === 'U' ? 'Largeur utile en fond' : 'Largeur en fond'}
-              value={t.largeur}
-              onChange={(v) => maj({ largeur: v, largeurAuto: false })}
-              unite="m"
-              min={0.1}
-              pas={0.05}
-              title={t.type === 'U' ? 'Entre les blindages' : undefined}
-            />
-            <label className="case case-petite">
-              <input type="checkbox" checked={t.largeurAuto} onChange={(e) => maj({ largeurAuto: e.target.checked })} />
-              Auto (selon tuyaux et écarts)
-            </label>
-          </div>
-          {t.type === 'U' && (
-            <NumberField
-              label="Blindage (par côté)"
-              value={t.blindage}
-              onChange={(v) => maj({ blindage: v })}
-              echelle={100}
-              decimales={1}
-              unite="cm"
-              min={0}
-              pas={1}
-              title="Épaisseur du blindage de chaque côté : elle s’ajoute à la largeur de fouille"
-            />
-          )}
-          {t.type === 'V' && (
-            <NumberField
-              label="Pente de talus (H/V)"
-              value={t.fruit}
-              onChange={(v) => maj({ fruit: v })}
-              min={0}
-              pas={0.05}
-              title="Fruit : élargissement horizontal par mètre de profondeur, de chaque côté"
-            />
-          )}
-        </div>
-        {t.type === 'U' && t.blindage > 0 && (
-          <p className="aide">
-            Largeur de fouille : {fmt(largeurFouille(t), 2)} m ({fmt(t.largeur, 2)} m utile + 2 × {fmt(t.blindage * 100, 1)} cm de blindage).
-          </p>
-        )}
-        <p className="aide">
-          Profondeur de fouille : {fmt(profondeur(t, amont, aval, 0), 2)} m en amont, {fmt(profondeur(t, amont, aval, 1), 2)} m en aval. Le fond
-          est calé sous le réseau le plus profond (fil d’eau − paroi − enrobage bas).
-        </p>
-      </fieldset>
-
-      <fieldset className="bloc-form" disabled={lie}>
-        <h3>Surface et décapage</h3>
-        <div className="grille-champs">
-          <div className="champ">
-            <span className="champ-label">Nature du dessus</span>
-            <div className="segment" role="radiogroup" aria-label="Nature du dessus">
-              <button type="button" role="radio" aria-checked={t.surface === 'terre'} className={t.surface === 'terre' ? 'actif' : ''} onClick={() => maj({ surface: 'terre' })}>
-                Terre
-              </button>
-              <button type="button" role="radio" aria-checked={t.surface === 'enrobe'} className={t.surface === 'enrobe' ? 'actif' : ''} onClick={() => maj({ surface: 'enrobe' })}>
-                Enrobé
-              </button>
-            </div>
-          </div>
-          <label className="case champ-case">
-            <input type="checkbox" checked={t.decapage.actif} onChange={(e) => maj({ decapage: { ...t.decapage, actif: e.target.checked } })} />
-            Décapage
-          </label>
-          {t.decapage.actif && (
-            <NumberField
-              label="Épaisseur de décapage"
-              value={t.decapage.epaisseur}
-              onChange={(v) => maj({ decapage: { ...t.decapage, epaisseur: v } })}
-              echelle={100}
-              decimales={1}
-              unite="cm"
-              min={0}
-              pas={1}
-            />
-          )}
-        </div>
-      </fieldset>
-
       <section className="bloc-form">
         <div className="titre-actions">
           <h3>Écarts entre tuyaux</h3>

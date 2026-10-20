@@ -1836,10 +1836,6 @@ fieldset.bloc-form:disabled {
   opacity: 0.6;
 }
 
-.editeur-longueur {
-  max-width: 200px;
-}
-
 /* ---------- Tracé en pleine largeur ---------- */
 /* Les lignes de saisie gardent une largeur de formulaire ; la tranchée du tronçon actif
    occupe toute la largeur entre ses deux regards. */
@@ -1907,16 +1903,6 @@ fieldset.bloc-form:disabled {
   border: 1px solid var(--bord);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
-}
-
-.reglages > summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.reglages[open] > summary {
-  margin-bottom: 0.6rem;
 }
 
 .detail-troncon-resultats {
