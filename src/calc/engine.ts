@@ -91,7 +91,16 @@ function fruitEffectif(t: Troncon): number {
   return t.type === 'V' ? Math.max(0, t.fruit) : 0;
 }
 
-/** Demi-largeur de la tranchée à la hauteur y au-dessus du fond */
+/**
+ * Largeur de fouille en fond : largeur utile plus le blindage des deux côtés (tranchée
+ * en U). Les tuyaux et leurs enrobages restent dans la largeur utile ; la place libérée
+ * par le blindage au retrait des panneaux est comblée avec le remblai et la structure.
+ */
+export function largeurFouille(t: Troncon): number {
+  return t.largeur + (t.type === 'U' ? 2 * Math.max(0, t.blindage) : 0);
+}
+
+/** Demi-largeur utile de la tranchée à la hauteur y au-dessus du fond */
 export function demiLargeur(t: Troncon, y: number): number {
   return t.largeur / 2 + fruitEffectif(t) * y;
 }
@@ -193,13 +202,13 @@ function aireBandeHaut(t: Troncon, H: number, z1: number, z2: number): number {
   const a = Math.max(0, Math.min(z1, H));
   const b = Math.max(0, Math.min(z2, H));
   if (b <= a) return 0;
-  return (b - a) * (t.largeur + 2 * f * H) - f * (b * b - a * a);
+  return (b - a) * (largeurFouille(t) + 2 * f * H) - f * (b * b - a * a);
 }
 
 export function section(t: Troncon, Hbrut: number, basTuyaux: number[] = basTuyauxUniformes(t)): Section {
   const H = Math.max(0, Hbrut);
   const f = fruitEffectif(t);
-  const fouille = t.largeur * H + f * H * H;
+  const fouille = largeurFouille(t) * H + f * H * H;
   const decapage = t.decapage.actif ? aireBandeHaut(t, H, 0, t.decapage.epaisseur) : 0;
 
   const geoms = geometrieTuyaux(t, basTuyaux);
@@ -230,7 +239,7 @@ export function section(t: Troncon, Hbrut: number, basTuyaux: number[] = basTuya
     tuyaux,
     couches,
     remblai: Math.max(0, fouille - aireBlocs - totalCouches),
-    largeurTete: t.largeur + 2 * f * H,
+    largeurTete: largeurFouille(t) + 2 * f * H,
     bornesCouches,
     hautEnrobage,
   };

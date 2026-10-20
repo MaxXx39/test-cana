@@ -29,6 +29,14 @@
   --c-couche-4: #b89f7d;
   --c-couche-5: #9fb38c;
 
+  /* Colonnes de saisie : fil d'eau / profondeur, et diamètre */
+  --col-fe-fond: #e4f3f6;
+  --col-fe-bord: #6fb3c2;
+  --col-fe-texte: #1d6878;
+  --col-dia-fond: #fdf0da;
+  --col-dia-bord: #dba657;
+  --col-dia-texte: #8a5a12;
+
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   color: var(--texte);
@@ -66,6 +74,13 @@
     --c-couche-3: #5f7590;
     --c-couche-4: #8c7759;
     --c-couche-5: #6f8460;
+
+    --col-fe-fond: #15303a;
+    --col-fe-bord: #2f7387;
+    --col-fe-texte: #7fcadb;
+    --col-dia-fond: #33270f;
+    --col-dia-bord: #8a6522;
+    --col-dia-texte: #e7b96a;
   }
 }
 
@@ -99,6 +114,13 @@
   --c-couche-3: #5f7590;
   --c-couche-4: #8c7759;
   --c-couche-5: #6f8460;
+
+  --col-fe-fond: #15303a;
+  --col-fe-bord: #2f7387;
+  --col-fe-texte: #7fcadb;
+  --col-dia-fond: #33270f;
+  --col-dia-bord: #8a6522;
+  --col-dia-texte: #e7b96a;
 }
 
 * {
@@ -676,8 +698,10 @@ h3 {
   color: var(--texte);
   cursor: pointer;
   padding: 0.15rem 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
   min-width: 0;
 }
 
@@ -1501,4 +1525,103 @@ th {
 
 .liste-reseaux-coupe button.actif {
   box-shadow: 0 0 0 1.5px var(--poignee);
+}
+
+/* ---------- Colonnes FE / Ø ---------- */
+.nf.col-fe {
+  background: var(--col-fe-fond);
+  border-color: var(--col-fe-bord);
+}
+
+.nf.col-dia {
+  background: var(--col-dia-fond);
+  border-color: var(--col-dia-bord);
+}
+
+.regard-fe-entete .entete-fe,
+.regard-fe-entete .entete-dia {
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+}
+
+.regard-fe-entete .entete-fe {
+  background: var(--col-fe-fond);
+  color: var(--col-fe-texte);
+}
+
+.regard-fe-entete .entete-dia {
+  background: var(--col-dia-fond);
+  color: var(--col-dia-texte);
+}
+
+/* ---------- Vignette de coupe dans le tracé ---------- */
+.troncon-textes {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mini-coupe {
+  width: 76px;
+  height: 54px;
+  display: block;
+  border-radius: 4px;
+  background: var(--c-sol);
+  border: 1px solid var(--bord);
+}
+
+.troncon-actif .mini-coupe {
+  border-color: var(--accent);
+}
+
+/* ---------- Blindage et écarts ---------- */
+.blindage-panneau {
+  fill: url(#hachures-blindage);
+  stroke: var(--texte-2);
+  stroke-width: 1;
+}
+
+.hachure-blindage {
+  stroke: var(--texte-2);
+  stroke-width: 1.4;
+}
+
+.cote-ecart line {
+  stroke: var(--poignee);
+  stroke-width: 1;
+}
+
+.cote-ecart line.rappel {
+  stroke-dasharray: 2 2;
+}
+
+.cote-ecart-texte {
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: var(--poignee);
+  paint-order: stroke;
+  stroke: var(--panneau);
+  stroke-width: 3px;
+}
+
+.case-petite {
+  font-size: 0.8rem;
+  color: var(--texte-2);
+  margin-top: 0.2rem;
+}
+
+.tuyau-gauche {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--texte-2);
+}
+
+.nf.col-ecart {
+  border-color: var(--poignee);
+}
+
+.mini-blindage {
+  fill: var(--texte-2);
+  opacity: 0.6;
 }

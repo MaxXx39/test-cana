@@ -45,6 +45,8 @@ export function nouveauTroncon(longueur: number, reseau: string): Troncon {
     longueur,
     type: 'U',
     largeur: 0.8,
+    largeurAuto: true,
+    blindage: 0,
     fruit: 0.5,
     surface: 'enrobe',
     decapage: { actif: true, epaisseur: 0.08 },
@@ -71,20 +73,78 @@ export function nouveauRegard(nom: string, tn: number, fe: Record<string, number
   return { id: nouvelId('regard'), nom, tn, fe };
 }
 
+const mm = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Tuyaux rangés de gauche à droite */
+export function tuyauxGaucheDroite(tuyaux: Tuyau[]): Tuyau[] {
+  return [...tuyaux].sort((a, b) => a.position - b.position);
+}
+
+/** Écart nu à nu (paroi à paroi) entre chaque tuyau et son voisin de gauche ; 0 pour le premier */
+export function ecartsTuyaux(tries: Tuyau[]): number[] {
+  return tries.map((x, i) => (i === 0 ? 0 : x.position - x.diametre / 2 - (tries[i - 1].position + tries[i - 1].diametre / 2)));
+}
+
+/** Écart par défaut entre deux tuyaux voisins : leurs enrobages se touchent */
+export function ecartJointif(a: Tuyau, b: Tuyau): number {
+  return a.enrobage.droite + b.enrobage.gauche;
+}
+
+/** Replace des tuyaux rangés de gauche à droite selon les écarts, paroi gauche du premier en x0 */
+function replacer(tries: Tuyau[], ecarts: number[], x0: number): Tuyau[] {
+  let x = x0;
+  return tries.map((p, i) => {
+    if (i > 0) x += ecarts[i];
+    const position = mm(x + p.diametre / 2);
+    x += p.diametre;
+    return { ...p, position };
+  });
+}
+
+/** Emprise latérale des enrobages : [bord gauche, bord droit] */
+function emprise(tuyaux: Tuyau[]): [number, number] {
+  return [
+    Math.min(...tuyaux.map((p) => p.position - p.diametre / 2 - p.enrobage.gauche)),
+    Math.max(...tuyaux.map((p) => p.position + p.diametre / 2 + p.enrobage.droite)),
+  ];
+}
+
+const versCmSuperieur = (v: number) => Math.ceil(v * 100 - 1e-6) / 100;
+
 /**
- * Place les tuyaux côte à côte (enrobages jointifs), le groupe étant centré.
+ * Recentre les tuyaux dans la tranchée. Largeur exacte : la largeur utile devient
+ * l'emprise des enrobages ; sinon elle n'est qu'élargie si les enrobages en sortent.
+ */
+function recentrer(t: Troncon, exacte: boolean): Troncon {
+  if (t.tuyaux.length === 0) return t;
+  const [a, b] = emprise(t.tuyaux);
+  const dx = -(a + b) / 2;
+  const besoin = versCmSuperieur(b - a);
+  return {
+    ...t,
+    largeur: exacte ? besoin : Math.max(t.largeur, besoin),
+    tuyaux: t.tuyaux.map((p) => ({ ...p, position: mm(p.position + dx) })),
+  };
+}
+
+/** En largeur automatique, recentre les tuyaux et ajuste la largeur à leur emprise */
+export function ajusterLargeur(t: Troncon): Troncon {
+  if (!t.largeurAuto || t.tuyaux.length === 0) return t;
+  const r = recentrer(t, true);
+  const inchange = Math.abs(r.largeur - t.largeur) < 1e-9 && r.tuyaux.every((p, i) => Math.abs(p.position - t.tuyaux[i].position) < 1e-9);
+  return inchange ? t : r;
+}
+
+/**
+ * Place les tuyaux côte à côte, enrobages jointifs, le groupe étant centré.
  * Renvoie aussi la largeur minimale de tranchée correspondante.
  */
 export function repartirTuyaux(tuyaux: Tuyau[]): { tuyaux: Tuyau[]; largeur: number } {
-  const largeurs = tuyaux.map((p) => p.enrobage.gauche + p.diametre + p.enrobage.droite);
-  const total = largeurs.reduce((a, b) => a + b, 0);
-  let x = -total / 2;
-  const places = tuyaux.map((p, i) => {
-    const position = x + p.enrobage.gauche + p.diametre / 2;
-    x += largeurs[i];
-    return { ...p, position: Math.round(position * 1000) / 1000 };
-  });
-  return { tuyaux: places, largeur: Math.ceil(total * 100 - 1e-6) / 100 };
+  if (tuyaux.length === 0) return { tuyaux, largeur: 0 };
+  const ecarts = tuyaux.map((x, i) => (i === 0 ? 0 : ecartJointif(tuyaux[i - 1], x)));
+  const places = replacer(tuyaux, ecarts, 0);
+  const [a, b] = emprise(places);
+  return { tuyaux: places.map((p) => ({ ...p, position: mm(p.position - (a + b) / 2) })), largeur: versCmSuperieur(b - a) };
 }
 
 /** Exemple de départ : double réseau EU + EP sur deux tronçons, EU seul sur le troisième */
@@ -99,6 +159,7 @@ export function projetExemple(): Projet {
     const { tuyaux, largeur } = repartirTuyaux([nouveauTuyau(eu.id, 0.2), nouveauTuyau(ep.id, 0.4)]);
     t.tuyaux = tuyaux;
     t.largeur = largeur;
+    t.blindage = 0.05;
     return t;
   };
   const t1 = double(35);
@@ -125,41 +186,56 @@ export function diametreParDefaut(p: Projet, reseau: string): number {
 }
 
 /**
- * Pose un tuyau du réseau dans le tronçon. Les tuyaux sont rangés dans l'ordre des
- * réseaux puis placés côte à côte ; la tranchée est élargie si nécessaire.
+ * Pose un tuyau du réseau dans le tronçon, à sa place dans l'ordre des réseaux, avec des
+ * enrobages jointifs de part et d'autre ; les écarts existants sont conservés.
  */
 export function poserReseau(t: Troncon, reseau: string, diametre: number, ordre: string[]): Troncon {
   if (t.tuyaux.some((x) => x.reseau === reseau)) return t;
-  const modele = t.tuyaux[t.tuyaux.length - 1];
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  const modele = tries[tries.length - 1];
   const nouveau = nouveauTuyau(reseau, diametre);
   if (modele) {
     nouveau.paroi = modele.paroi;
     nouveau.enrobage = { ...modele.enrobage };
   }
-  const tries = [...t.tuyaux, nouveau].sort((a, b) => ordre.indexOf(a.reseau) - ordre.indexOf(b.reseau));
-  const r = repartirTuyaux(tries);
-  return { ...t, tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) };
+  if (tries.length === 0) return recentrer({ ...t, tuyaux: [nouveau] }, t.largeurAuto);
+  const rang = (x: Tuyau) => ordre.indexOf(x.reseau);
+  let k = tries.findIndex((x) => rang(x) > rang(nouveau));
+  if (k < 0) k = tries.length;
+  const ecarts = ecartsTuyaux(tries);
+  const x0 = tries[0].position - tries[0].diametre / 2;
+  tries.splice(k, 0, nouveau);
+  ecarts.splice(k, 0, k > 0 ? ecartJointif(tries[k - 1], nouveau) : 0);
+  if (k + 1 < tries.length) ecarts[k + 1] = ecartJointif(nouveau, tries[k + 1]);
+  ecarts[0] = 0;
+  return recentrer({ ...t, tuyaux: replacer(tries, ecarts, x0) }, t.largeurAuto);
 }
 
-/**
- * Change le diamètre des tuyaux d'un réseau dans le tronçon. Si les enrobages se
- * recouvrent ou sortent de la tranchée, les tuyaux sont replacés côte à côte.
- */
+/** Change le diamètre des tuyaux d'un réseau en conservant les écarts nu à nu */
 export function changerDiametre(t: Troncon, reseau: string, diametre: number): Troncon {
-  const tuyaux = t.tuyaux.map((x) => (x.reseau === reseau ? { ...x, diametre } : x));
-  const blocs = tuyaux.map((x) => [x.position - x.diametre / 2 - x.enrobage.gauche, x.position + x.diametre / 2 + x.enrobage.droite]);
-  const dehors = blocs.some(([a, b]) => a < -t.largeur / 2 - 1e-9 || b > t.largeur / 2 + 1e-9);
-  const recouvrement = blocs.some(([a, b], i) => blocs.some(([c, d], j) => j > i && a < d - 1e-9 && c < b - 1e-9));
-  if (!dehors && !recouvrement) return { ...t, tuyaux };
-  const r = repartirTuyaux(tuyaux);
-  return { ...t, tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) };
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  if (tries.length === 0) return t;
+  const ecarts = ecartsTuyaux(tries);
+  const x0 = tries[0].position - tries[0].diametre / 2;
+  const modifies = tries.map((x) => (x.reseau === reseau ? { ...x, diametre } : x));
+  return recentrer({ ...t, tuyaux: replacer(modifies, ecarts, x0) }, t.largeurAuto);
 }
 
-/** Retire les tuyaux du réseau du tronçon et replace les autres côte à côte (largeur conservée) */
+/** Fixe l'écart nu à nu entre un tuyau et son voisin de gauche ; les tuyaux à droite suivent */
+export function changerEcart(t: Troncon, id: string, ecart: number): Troncon {
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  const k = tries.findIndex((x) => x.id === id);
+  if (k <= 0) return t;
+  const ecarts = ecartsTuyaux(tries);
+  ecarts[k] = ecart;
+  return recentrer({ ...t, tuyaux: replacer(tries, ecarts, tries[0].position - tries[0].diametre / 2) }, t.largeurAuto);
+}
+
+/** Retire les tuyaux du réseau du tronçon ; les autres gardent leurs écarts */
 export function retirerReseauTroncon(t: Troncon, reseau: string): Troncon {
   const reste = t.tuyaux.filter((x) => x.reseau !== reseau);
   if (reste.length === t.tuyaux.length) return t;
-  return { ...t, tuyaux: repartirTuyaux(reste).tuyaux };
+  return recentrer({ ...t, tuyaux: reste }, t.largeurAuto);
 }
 
 /** Ajoute un réseau ; son fil d'eau aux regards part de celui du premier réseau, relevé de 30 cm */
@@ -296,6 +372,8 @@ export function normaliserProjet(brut: unknown): Projet {
     longueur: nombre(t?.longueur, base.longueur),
     type: t?.type === 'V' ? ('V' as const) : ('U' as const),
     largeur: nombre(t?.largeur, base.largeur),
+    largeurAuto: typeof t?.largeurAuto === 'boolean' ? t.largeurAuto : false,
+    blindage: Math.max(0, nombre(t?.blindage, 0)),
     fruit: nombre(t?.fruit, base.fruit),
     surface: t?.surface === 'terre' ? ('terre' as const) : ('enrobe' as const),
     decapage: {

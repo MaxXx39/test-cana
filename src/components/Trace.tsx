@@ -2,6 +2,7 @@ import type { ModeSaisie, Projet, Regard, Reseau, Troncon } from '../calc/types'
 import type { ResultatTroncon } from '../calc/engine';
 import { changerDiametre, COULEURS_RESEAUX, diametreParDefaut, poserReseau, retirerReseauTroncon } from '../calc/projet';
 import { fmt } from '../utils/format';
+import { MiniCoupe } from './MiniCoupe';
 import { NumberField } from './NumberField';
 
 interface Props {
@@ -125,8 +126,8 @@ export function Trace({
         <span title="Posé vers l’aval">↓</span>
         <span />
         <span>Réseau</span>
-        <span>{saisie === 'altitudes' ? 'FE (m)' : 'Prof. (m)'}</span>
-        <span>Ø (mm)</span>
+        <span className="entete-fe">{saisie === 'altitudes' ? 'FE (m)' : 'Prof. (m)'}</span>
+        <span className="entete-dia">Ø (mm)</span>
         <span className="num">{saisie === 'altitudes' ? 'Prof.' : ''}</span>
       </div>
 
@@ -181,13 +182,14 @@ export function Trace({
                     {!utile ? (
                       <span className="regard-fe-tiret">—</span>
                     ) : saisie === 'altitudes' ? (
-                      <NumberField value={fe} onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })} decimales={2} pas={0.01} title={`Fil d’eau ${x.nom} au regard ${r.nom} (m)`} />
+                      <NumberField value={fe} onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })} decimales={2} pas={0.01} className="col-fe" title={`Fil d’eau ${x.nom} au regard ${r.nom} (m)`} />
                     ) : (
                       <NumberField
                         value={prof}
                         onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: r.tn - v } })}
                         decimales={2}
                         pas={0.01}
+                        className="col-fe"
                         title={`Profondeur ${x.nom} au regard ${r.nom} (m)`}
                       />
                     )}
@@ -199,6 +201,7 @@ export function Trace({
                         decimales={0}
                         min={10}
                         pas={10}
+                        className="col-dia"
                         title={`Diamètre extérieur ${x.nom} de ${r.nom} vers ${regards[i + 1].nom} (mm)`}
                       />
                     ) : (
@@ -214,11 +217,14 @@ export function Trace({
             {t && (
               <div className={`troncon-bloc ${i === actif ? 'troncon-actif' : ''}`}>
                 <div className="troncon-ligne">
-                  <button type="button" className="troncon-select" onClick={() => onSelect(i)} aria-pressed={i === actif}>
-                    <span className="troncon-titre">Tronçon {i + 1}</span>
-                    <span className="troncon-sous">
-                      {t.type} {fmt(t.largeur, 2)} m{res ? ` · ${fmt(res.fouille, 1)} m³` : ''}
-                      {res && res.alertes.length > 0 && <span className="badge-alerte"> · ⚠ {res.alertes.length}</span>}
+                  <button type="button" className="troncon-select" onClick={() => onSelect(i)} aria-pressed={i === actif} title="Afficher ce tronçon">
+                    <MiniCoupe troncon={t} amont={r} aval={regards[i + 1]} reseaux={reseaux} />
+                    <span className="troncon-textes">
+                      <span className="troncon-titre">Tronçon {i + 1}</span>
+                      <span className="troncon-sous">
+                        {t.type} {fmt(t.largeur, 2)} m{res ? ` · ${fmt(res.fouille, 1)} m³` : ''}
+                        {res && res.alertes.length > 0 && <span className="badge-alerte"> · ⚠ {res.alertes.length}</span>}
+                      </span>
                     </span>
                   </button>
                   <NumberField value={t.longueur} onChange={(v) => onTroncon(i, { ...t, longueur: v })} decimales={2} unite="m" min={0} pas={1} title="Longueur du tronçon" />

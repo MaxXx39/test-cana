@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, section } from '../calc/engine';
+import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
+import { ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
 import type { ModeSaisie, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
 import { arrondir, fmt } from '../utils/format';
 
@@ -14,7 +15,8 @@ interface Props {
   /** En saisie par profondeurs, les altitudes ne sont pas affichées */
   saisie: ModeSaisie;
   mode: ModeCoupe;
-  onChange: (t: Troncon) => void;
+  /** enCours : modification pendant un glisser (la largeur automatique est appliquée au relâcher) */
+  onChange: (t: Troncon, enCours?: boolean) => void;
   selection: string | null;
   onSelect: (id: string | null) => void;
 }
@@ -62,7 +64,7 @@ function gabarit(largeur: number): Gabarit {
 
 const PAD = 8;
 const TOP = 70;
-const BAS = 56;
+const BAS = 66;
 const PAS_ETIQUETTE = 18;
 
 function miseEnPage(g: Gabarit, largeurMonde: number, profondeurMax: number): Mise {
@@ -128,7 +130,9 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   const W = t.largeur;
   const sec = section(t, H, etat.basTuyaux);
   const geoms = geometrieTuyaux(t, etat.basTuyaux);
-  const Wt = W + 2 * f * H;
+  /** Largeur de fouille (blindage compris) en fond, puis en tête */
+  const Wf = largeurFouille(t);
+  const Wt = Wf + 2 * f * H;
 
   const profRegards = [amont, aval].flatMap((r) => reseauxRegard.map((x) => r.tn - filDEauRegard(r, x.id)));
   const largeurMonde = Math.max(Wt, ...geoms.map((g) => 2 * Math.max(Math.abs(g.bloc.x0), Math.abs(g.bloc.x1)))) * 1.25 + 0.3;
@@ -142,7 +146,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   const Yz = (z: number) => TOP + z * s;
   /** depuis une hauteur au-dessus du fond */
   const Yy = (y: number) => TOP + (H - y) * s;
-  const hw = (z: number) => W / 2 + f * (H - z);
+  const hw = (z: number) => Wf / 2 + f * (H - z);
 
   const LIGNE_FE = 14;
   const basJauges =
@@ -154,11 +158,22 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
 
   const poly = (pts: number[][]) => pts.map((p) => p.join(',')).join(' ');
   const tranchee = poly([
+    [X(-Wf / 2), Yy(0)],
+    [X(Wf / 2), Yy(0)],
+    [X(Wf / 2 + f * H), Yy(H)],
+    [X(-Wf / 2 - f * H), Yy(H)],
+  ]);
+  /** Partie utile, entre blindages : les enrobages y sont rognés */
+  const utile = poly([
     [X(-W / 2), Yy(0)],
     [X(W / 2), Yy(0)],
     [X(W / 2 + f * H), Yy(H)],
     [X(-W / 2 - f * H), Yy(H)],
   ]);
+  const epBlindage = Wf - W > 1e-9 ? (Wf - W) / 2 : 0;
+  // Écarts nu à nu entre tuyaux voisins (de gauche à droite)
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  const ecarts = ecartsTuyaux(tries);
   const bande = (z1: number, z2: number) =>
     poly([
       [X(-hw(z1)), Yz(z1)],
@@ -178,7 +193,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   };
 
   const majTuyau = (id: string, maj: (p: Tuyau) => Tuyau) =>
-    onChange({ ...t, tuyaux: t.tuyaux.map((p) => (p.id === id ? maj(p) : p)) });
+    onChange({ ...t, tuyaux: t.tuyaux.map((p) => (p.id === id ? maj(p) : p)) }, true);
 
   const surDeplacement = (e: ReactPointerEvent) => {
     const d = drag.current;
@@ -188,13 +203,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     const cmArrondi = (v: number) => Math.max(0, arrondir(v, 0.01));
     switch (d.k) {
       case 'largeur':
-        onChange({ ...t, largeur: Math.max(0.1, arrondir(2 * Math.abs(x), 0.01)) });
+        onChange({ ...t, largeur: Math.max(0.1, arrondir(2 * Math.abs(x), 0.01)), largeurAuto: false }, true);
         break;
       case 'fruit':
-        onChange({ ...t, fruit: Math.max(0, arrondir((Math.abs(x) - W / 2) / H, 0.05)) });
+        onChange({ ...t, fruit: Math.max(0, arrondir((Math.abs(x) - W / 2) / H, 0.05)) }, true);
         break;
       case 'decapage':
-        onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0.01, Math.min(H, arrondir(z, 0.01))) } });
+        onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0.01, Math.min(H, arrondir(z, 0.01))) } }, true);
         break;
       case 'position':
         majTuyau(d.id, (p) => ({ ...p, position: arrondir(x, 0.01) }));
@@ -215,7 +230,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
       case 'couche': {
         const debut = t.couches.slice(0, d.index).reduce((a, c) => a + c.epaisseur, 0);
         const couches = t.couches.map((c, i) => (i === d.index ? { ...c, epaisseur: Math.max(0.01, arrondir(z - debut, 0.01)) } : c));
-        onChange({ ...t, couches });
+        onChange({ ...t, couches }, true);
         break;
       }
     }
@@ -231,6 +246,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   };
 
   const terminer = () => {
+    // Fin de glisser : la modification est validée (largeur automatique appliquée)
+    if (drag.current) onChange(t);
     drag.current = null;
     setGel(null);
   };
@@ -408,6 +425,12 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           <clipPath id="clip-tranchee">
             <polygon points={tranchee} />
           </clipPath>
+          <clipPath id="clip-utile">
+            <polygon points={utile} />
+          </clipPath>
+          <pattern id="hachures-blindage" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+            <line x1="0" y1="0" x2="0" y2="6" className="hachure-blindage" />
+          </pattern>
           <pattern id="sable" width="7" height="7" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="0.9" className="grain" />
             <circle cx="5.5" cy="5" r="0.7" className="grain" />
@@ -427,7 +450,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
 
         {/* Tranchée : remblai, enrobages, structure */}
         <polygon points={tranchee} className="remblai" />
-        <g clipPath="url(#clip-tranchee)">
+        <g clipPath="url(#clip-utile)">
           {geoms.map((g) => (
             <rect
               key={g.tuyau.id}
@@ -449,6 +472,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               pointerEvents="none"
             />
           ))}
+        </g>
+        <g clipPath="url(#clip-tranchee)">
           {sec.bornesCouches.map(([z1, z2], i) =>
             z2 > z1 ? <polygon key={t.couches[i].id} points={bande(z1, z2)} className={`couche couche-${i % 6}`} /> : null,
           )}
@@ -456,8 +481,25 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
         <polygon points={tranchee} className="tranchee-contour" />
         {t.type === 'U' && (
           <>
-            <line x1={X(-W / 2) - 3} x2={X(-W / 2) - 3} y1={Yy(0)} y2={Yy(H)} className="blindage" />
-            <line x1={X(W / 2) + 3} x2={X(W / 2) + 3} y1={Yy(0)} y2={Yy(H)} className="blindage" />
+            {epBlindage > 0 ? (
+              [-1, 1].map((cote) => (
+                <rect
+                  key={cote}
+                  x={cote < 0 ? X(-Wf / 2) : X(W / 2)}
+                  y={Yy(H)}
+                  width={epBlindage * s}
+                  height={H * s}
+                  className="blindage-panneau"
+                >
+                  <title>{`Blindage · ${cm(epBlindage)} cm`}</title>
+                </rect>
+              ))
+            ) : (
+              <>
+                <line x1={X(-W / 2) - 3} x2={X(-W / 2) - 3} y1={Yy(0)} y2={Yy(H)} className="blindage" />
+                <line x1={X(W / 2) + 3} x2={X(W / 2) + 3} y1={Yy(0)} y2={Yy(H)} className="blindage" />
+              </>
+            )}
           </>
         )}
         {t.decapage.actif && (
@@ -518,8 +560,37 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           <line x1={X(-W / 2)} x2={X(-W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 26} />
           <line x1={X(W / 2)} x2={X(W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 26} />
           <text x={X(0)} y={Yy(0) + 38} textAnchor="middle" className="cote-texte">
-            {fmt(W, 2)} m
+            {epBlindage <= 0
+              ? `${fmt(W, 2)} m`
+              : gab.compact
+                ? `${fmt(W, 2)} m + 2 × ${cm(epBlindage)} cm`
+                : `${fmt(W, 2)} m utile · fouille ${fmt(Wf, 2)} m (blindage ${cm(epBlindage)} cm)`}
           </text>
+          {/* Écarts nu à nu entre tuyaux voisins */}
+          {tries.slice(1).map((b, i) => {
+            const ga = geoms.find((g) => g.tuyau.id === tries[i].id)!;
+            const gb = geoms.find((g) => g.tuyau.id === b.id)!;
+            const e = ecarts[i + 1];
+            if (e < 0.005) return null;
+            const x1 = X(ga.cx + ga.r);
+            const x2 = X(gb.cx - gb.r);
+            const y = Yy(Math.min(ga.cy, gb.cy));
+            return (
+              <g key={b.id} className="cote-ecart">
+                {/* lignes de rappel depuis les génératrices latérales, si les tuyaux sont à des hauteurs différentes */}
+                {Math.abs(Yy(ga.cy) - y) > 1 && <line x1={x1} x2={x1} y1={Yy(ga.cy)} y2={y} className="rappel" />}
+                {Math.abs(Yy(gb.cy) - y) > 1 && <line x1={x2} x2={x2} y1={Yy(gb.cy)} y2={y} className="rappel" />}
+                <line x1={x1} x2={x2} y1={y} y2={y} />
+                <line x1={x1} x2={x1} y1={y - 4} y2={y + 4} />
+                <line x1={x2} x2={x2} y1={y - 4} y2={y + 4} />
+                {x2 - x1 > 22 && (
+                  <text x={(x1 + x2) / 2} y={y - 4} textAnchor="middle" className="cote-ecart-texte">
+                    {cm(e)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
           {t.type === 'V' && (
             <>
               <line x1={X(-Wt / 2)} x2={X(Wt / 2)} y1={Yz(0) - 16} y2={Yz(0) - 16} />

@@ -60,8 +60,12 @@ export interface Troncon {
   /** Longueur du tronçon entre les deux regards */
   longueur: number;
   type: TrenchType;
-  /** Largeur de tranchée en fond */
+  /** Largeur utile de tranchée en fond (entre blindages pour une tranchée en U) */
   largeur: number;
+  /** Largeur ajustée automatiquement aux tuyaux (enrobages et écarts), tuyaux centrés */
+  largeurAuto: boolean;
+  /** Tranchée en U : épaisseur du blindage de chaque côté, qui s'ajoute à la largeur de fouille */
+  blindage: number;
   /** Pente de talus (type V) : fruit horizontal / vertical, par côté */
   fruit: number;
   surface: SurfaceNature;

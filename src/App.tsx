@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calculProjet } from './calc/engine';
-import { ajouterReseau, dupliquerTroncon, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
+import { ajouterReseau, ajusterLargeur, dupliquerTroncon, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
 import type { Projet, Reseau, Troncon } from './calc/types';
 import { CoupeTransversale, type ModeCoupe } from './components/CoupeTransversale';
 import { DetailTroncon, TableauTroncons, TotalGlobal } from './components/Resultats';
@@ -121,7 +121,11 @@ export default function App() {
   const troncon = projet.troncons[index];
   const resultats = useMemo(() => calculProjet(projet), [projet]);
 
-  const majTroncon = (t: Troncon) => modifier((p) => ({ ...p, troncons: p.troncons.map((x, i) => (i === index ? t : x)) }));
+  /** Pendant un glisser sur la coupe, la largeur automatique attend le relâcher */
+  const majTroncon = (t: Troncon, enCours = false) => {
+    const n = enCours ? t : ajusterLargeur(t);
+    modifier((p) => ({ ...p, troncons: p.troncons.map((x, i) => (i === index ? n : x)) }));
+  };
 
   const appliquerATous = () =>
     setConfirmation({
@@ -298,7 +302,7 @@ export default function App() {
               setSelection(null);
             }}
             onRegard={(i, r) => modifier((p) => ({ ...p, regards: p.regards.map((x, j) => (j === i ? r : x)) }))}
-            onTroncon={(i, t) => modifier((p) => ({ ...p, troncons: p.troncons.map((x, j) => (j === i ? t : x)) }))}
+            onTroncon={(i, t) => modifier((p) => ({ ...p, troncons: p.troncons.map((x, j) => (j === i ? ajusterLargeur(t) : x)) }))}
             onSaisie={(saisie) => modifier((p) => ({ ...p, saisie }))}
             onInserer={(i) => {
               modifier((p) => insererRegard(p, i));

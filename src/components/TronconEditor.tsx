@@ -1,6 +1,6 @@
 import type { Couche, ModeSaisie, OptionsMateriau, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
-import { nouvelleCouche, repartirTuyaux } from '../calc/projet';
-import { filDEauRegard, profondeur } from '../calc/engine';
+import { changerEcart, ecartsTuyaux, nouvelleCouche, repartirTuyaux, tuyauxGaucheDroite } from '../calc/projet';
+import { filDEauRegard, largeurFouille, profondeur } from '../calc/engine';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -74,9 +74,12 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
 
   /** Place les tuyaux côte à côte, centrés ; élargit la tranchée si besoin */
   const repartir = (tuyaux: Tuyau[]) => {
-    const r = repartirTuyaux(tuyaux);
-    maj({ tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) });
+    const r = repartirTuyaux(tuyauxGaucheDroite(tuyaux));
+    maj({ tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
   };
+
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  const ecarts = ecartsTuyaux(tries);
 
   const enrobageATous = (e: Tuyau['enrobage']) => maj({ tuyaux: t.tuyaux.map((p) => ({ ...p, enrobage: { ...e } })) });
 
@@ -97,7 +100,34 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
               </button>
             </div>
           </div>
-          <NumberField label="Largeur en fond" value={t.largeur} onChange={(v) => maj({ largeur: v })} unite="m" min={0.1} pas={0.05} />
+          <div className="champ">
+            <NumberField
+              label={t.type === 'U' ? 'Largeur utile en fond' : 'Largeur en fond'}
+              value={t.largeur}
+              onChange={(v) => maj({ largeur: v, largeurAuto: false })}
+              unite="m"
+              min={0.1}
+              pas={0.05}
+              title={t.type === 'U' ? 'Entre les blindages' : undefined}
+            />
+            <label className="case case-petite">
+              <input type="checkbox" checked={t.largeurAuto} onChange={(e) => maj({ largeurAuto: e.target.checked })} />
+              Auto (selon tuyaux et écarts)
+            </label>
+          </div>
+          {t.type === 'U' && (
+            <NumberField
+              label="Blindage (par côté)"
+              value={t.blindage}
+              onChange={(v) => maj({ blindage: v })}
+              echelle={100}
+              decimales={1}
+              unite="cm"
+              min={0}
+              pas={1}
+              title="Épaisseur du blindage de chaque côté : elle s’ajoute à la largeur de fouille"
+            />
+          )}
           {t.type === 'V' && (
             <NumberField
               label="Pente de talus (H/V)"
@@ -109,6 +139,11 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
             />
           )}
         </div>
+        {t.type === 'U' && t.blindage > 0 && (
+          <p className="aide">
+            Largeur de fouille : {fmt(largeurFouille(t), 2)} m ({fmt(t.largeur, 2)} m utile + 2 × {fmt(t.blindage * 100, 1)} cm de blindage).
+          </p>
+        )}
         <p className="aide">
           Profondeur de fouille : {fmt(profondeur(t, amont, aval, 0), 2)} m en amont, {fmt(profondeur(t, amont, aval, 1), 2)} m en aval. Le fond
           est calé sous le réseau le plus profond (fil d’eau − paroi − enrobage bas).
@@ -152,14 +187,14 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
         <div className="titre-actions">
           <h3>Position et enrobage des tuyaux</h3>
           {t.tuyaux.length > 1 && (
-            <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Placer les tuyaux côte à côte, centrés (élargit la tranchée si nécessaire)">
-              Répartir côte à côte
+            <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Écarts ramenés à des enrobages jointifs, tuyaux centrés">
+              Enrobages jointifs
             </button>
           )}
         </div>
         {t.tuyaux.length === 0 && <p className="aide">Aucun tuyau : cochez un réseau dans ce tronçon, colonne Tracé. La fouille est entièrement remblayée.</p>}
         <div className="liste-tuyaux">
-          {t.tuyaux.map((p) => {
+          {tries.map((p, k) => {
             const res = reseaux.find((r) => r.id === p.reseau);
             const sel = p.id === selection;
             const feA = filDEauRegard(amont, p.reseau);
@@ -177,7 +212,18 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
                     {res?.nom}
                   </span>
                   <NumberField value={p.diametre} onChange={(v) => majTuyau(p.id, { diametre: v })} echelle={1000} decimales={0} unite="mm" min={10} pas={10} title="Diamètre extérieur" />
-                  <NumberField value={p.position} onChange={(v) => majTuyau(p.id, { position: v })} unite="m" pas={0.05} title="Position de l’axe du tuyau par rapport à l’axe de la tranchée (négatif = à gauche)" />
+                  {k === 0 ? (
+                    <span className="tuyau-gauche">le plus à gauche</span>
+                  ) : (
+                    <NumberField
+                      value={ecarts[k]}
+                      onChange={(v) => onChange(changerEcart(t, p.id, v))}
+                      unite="m"
+                      pas={0.05}
+                      className="col-ecart"
+                      title={`Écart nu à nu (paroi à paroi) avec ${reseaux.find((r) => r.id === tries[k - 1].reseau)?.nom ?? 'le tuyau de gauche'}`}
+                    />
+                  )}
                   <span />
                 </div>
                 <div className="tuyau-resume">
@@ -220,7 +266,10 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
           })}
         </div>
         {t.tuyaux.length > 0 && (
-          <p className="aide">Cliquez un tuyau (ici ou sur la coupe) pour régler son enrobage. Les réseaux posés, leur diamètre et leur profondeur se saisissent dans la colonne Tracé.</p>
+          <p className="aide">
+            Tuyaux de gauche à droite. L’écart est la distance nu à nu (paroi à paroi) avec le tuyau de gauche, coté en orange sur la coupe.
+            Cliquez un tuyau pour régler son enrobage ; réseaux, diamètres et profondeurs se saisissent dans le Tracé.
+          </p>
         )}
       </section>
 

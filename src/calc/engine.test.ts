@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, section } from './engine';
 import {
   ajouterReseau,
+  changerDiametre,
+  changerEcart,
+  ecartsTuyaux,
+  tuyauxGaucheDroite,
   diametreParDefaut,
   poserReseau,
   retirerReseauTroncon,
@@ -295,7 +299,40 @@ describe('édition du tracé et des réseaux', () => {
     const retire = retirerReseauTroncon(pose, ep);
     expect(retire.tuyaux.map((x) => x.reseau)).toEqual([eu]);
     expect(retire.tuyaux[0].position).toBeCloseTo(0, 9);
-    expect(retire.largeur).toBeCloseTo(pose.largeur, 9);
+    // largeur automatique : ramenée à l'emprise de l'enrobage restant
+    expect(retire.largeur).toBeCloseTo(0.5, 9);
+    // largeur fixe : conservée
+    expect(retirerReseauTroncon({ ...pose, largeurAuto: false }, ep).largeur).toBeCloseTo(1.2, 9);
+  });
+
+  it('écart nu à nu entre réseaux et largeur automatique', () => {
+    const p = projetExemple();
+    const t = p.troncons[0]; // EU Ø200 + EP Ø400, enrobages 15 cm, jointifs
+    expect(ecartsTuyaux(tuyauxGaucheDroite(t.tuyaux))).toEqual([0, expect.closeTo(0.3, 9)]);
+    const e = changerEcart(t, tuyauxGaucheDroite(t.tuyaux)[1].id, 0.5);
+    const [a, b] = tuyauxGaucheDroite(e.tuyaux);
+    expect(b.position - b.diametre / 2 - (a.position + a.diametre / 2)).toBeCloseTo(0.5, 9);
+    expect(e.largeur).toBeCloseTo(1.4, 9);
+    // groupe centré : emprise symétrique
+    expect(a.position - a.diametre / 2 - a.enrobage.gauche).toBeCloseTo(-(b.position + b.diametre / 2 + b.enrobage.droite), 9);
+    // un changement de diamètre conserve l'écart
+    const d = changerDiametre(e, p.reseaux[0].id, 0.3);
+    const [c, f] = tuyauxGaucheDroite(d.tuyaux);
+    expect(f.position - f.diametre / 2 - (c.position + c.diametre / 2)).toBeCloseTo(0.5, 9);
+    expect(d.largeur).toBeCloseTo(1.5, 9);
+  });
+
+  it('le blindage élargit la fouille, pas la largeur utile des tuyaux', () => {
+    const t = tronconNu({ largeur: 1, blindage: 0.05, tuyaux: [{ ...tuyau, enrobage: { bas: 0.1, haut: 0.2, gauche: 0.3, droite: 0.3 } }] });
+    const r = calculTroncon(projet(t, 2, 2), 0);
+    expect(r.fouille).toBeCloseTo(10 * 1.1 * 2.1, 9);
+    expect(r.surfaceTete).toBeCloseTo(10 * 1.1, 9);
+    // enrobage rogné à la largeur utile (1 m), sans alerte
+    expect(r.enrobage).toBeCloseTo(10 * (1 * 0.7 - Math.PI * 0.04), 9);
+    expect(r.alertes).toEqual([]);
+    // pas de blindage en V
+    const v = calculTroncon(projet(tronconNu({ type: 'V', fruit: 0, largeur: 1, blindage: 0.05 }), 2, 2), 0);
+    expect(v.fouille).toBeCloseTo(20, 9);
   });
 
   it('ajouter puis supprimer un réseau', () => {

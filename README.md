@@ -25,8 +25,9 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
    - **TN + FE** : altitude du terrain naturel et fil d’eau de chaque réseau ;
    - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
      volumes ne dépendent que des profondeurs).
-3. **Tronçon** : cliquer un tronçon pour régler la tranchée, la position et l’enrobage des
-   tuyaux, la structure. La coupe transversale est dessinée à l’échelle, avec le regard
+3. **Tronçon** : cliquer un tronçon (vignette de sa coupe dans le Tracé) pour régler la
+   tranchée (largeur, automatique ou non, blindage en U), l’écart entre tuyaux, leur
+   enrobage, la structure. La coupe transversale est dessinée à l’échelle, avec le regard
    amont à gauche et le regard aval à droite (un puits par réseau).
 4. **Résultats** : volumes du tronçon à côté du formulaire, tableau de tous les tronçons
    et total global en bas de page. Export CSV (séparateur `;`, virgule décimale) et
@@ -46,8 +47,14 @@ Repère de la coupe : y = 0 au fond de fouille. Toutes les dimensions sont en m�
   le plus profond : `fond = min(FE − paroi − enrobage bas)`, et `H = TN − fond`. Le réseau
   qui fixe le fond peut changer le long du tronçon ; le calcul est alors découpé au point
   de bascule.
-- **Tranchée en U** : `largeur × hauteur moyenne × longueur`. Surface de blindage
-  calculée sur les deux faces.
+- **Tranchée en U** : `largeur de fouille × hauteur moyenne × longueur`, où la largeur de
+  fouille est la largeur utile plus l’épaisseur du blindage de chaque côté. Les tuyaux et
+  leurs enrobages restent dans la largeur utile ; la place des panneaux, libérée au
+  retrait, est comptée en remblai et en structure. Surface de blindage calculée sur les
+  deux faces.
+- **Écarts entre réseaux** : distance nu à nu (paroi à paroi) entre chaque tuyau et son
+  voisin de gauche. En largeur automatique, les tuyaux sont centrés et la largeur utile
+  est l’emprise de leurs enrobages.
 - **Tranchée en V** : la largeur vaut `largeur fond + 2 × fruit × y`. La profondeur variant
   linéairement entre les regards, le volume est intégré exactement :
   `L × (l·Hm + fruit·(H1² + H1·H2 + H2²)/3)` (sur chaque morceau où H est affine).
