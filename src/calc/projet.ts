@@ -1,4 +1,4 @@
-import type { Couche, OptionsMateriau, Projet, Regard, Reseau, Troncon, Tuyau } from './types';
+import type { Couche, Enrobage, OptionsMateriau, Projet, Regard, Reseau, Troncon, Tuyau } from './types';
 
 let compteur = 0;
 export function nouvelId(prefixe: string): string {
@@ -20,18 +20,21 @@ export function couleurPour(nom: string, prises: string[]): string {
   return COULEURS_RESEAUX.find((c) => !prises.includes(c)) ?? COULEURS_RESEAUX[prises.length % COULEURS_RESEAUX.length];
 }
 
-export function nouveauReseau(nom: string, couleur: string): Reseau {
-  return { id: nouvelId('reseau'), nom, couleur };
+/** Enrobage proposé pour un nouveau réseau */
+export const ENROBAGE_DEFAUT: Enrobage = { bas: 0.1, haut: 0.15, gauche: 0.15, droite: 0.15 };
+
+export function nouveauReseau(nom: string, couleur: string, enrobage: Enrobage = ENROBAGE_DEFAUT): Reseau {
+  return { id: nouvelId('reseau'), nom, couleur, enrobage: { ...enrobage } };
 }
 
-export function nouveauTuyau(reseau: string, diametre = 0.315, position = 0): Tuyau {
+export function nouveauTuyau(reseau: string, diametre = 0.315, position = 0, enrobage: Enrobage = ENROBAGE_DEFAUT): Tuyau {
   return {
     id: nouvelId('tuyau'),
     reseau,
     diametre,
     paroi: 0,
     position,
-    enrobage: { bas: 0.1, haut: 0.15, gauche: 0.15, droite: 0.15 },
+    enrobage: { ...enrobage },
   };
 }
 
@@ -189,15 +192,12 @@ export function diametreParDefaut(p: Projet, reseau: string): number {
  * Pose un tuyau du réseau dans le tronçon, à sa place dans l'ordre des réseaux, avec des
  * enrobages jointifs de part et d'autre ; les écarts existants sont conservés.
  */
-export function poserReseau(t: Troncon, reseau: string, diametre: number, ordre: string[]): Troncon {
-  if (t.tuyaux.some((x) => x.reseau === reseau)) return t;
+export function poserReseau(t: Troncon, reseau: Reseau, diametre: number, ordre: string[]): Troncon {
+  if (t.tuyaux.some((x) => x.reseau === reseau.id)) return t;
   const tries = tuyauxGaucheDroite(t.tuyaux);
   const modele = tries[tries.length - 1];
-  const nouveau = nouveauTuyau(reseau, diametre);
-  if (modele) {
-    nouveau.paroi = modele.paroi;
-    nouveau.enrobage = { ...modele.enrobage };
-  }
+  const nouveau = nouveauTuyau(reseau.id, diametre, 0, reseau.enrobage);
+  if (modele) nouveau.paroi = modele.paroi;
   if (tries.length === 0) return recentrer({ ...t, tuyaux: [nouveau] }, t.largeurAuto);
   const rang = (x: Tuyau) => ordre.indexOf(x.reseau);
   let k = tries.findIndex((x) => rang(x) > rang(nouveau));
@@ -262,10 +262,32 @@ export function dupliquerVers(p: Projet, source: number, cibles: number[], optio
   };
 }
 
+/**
+ * Met à jour un réseau. Son enrobage est recopié sur tous ses tuyaux, dans tous les
+ * tronçons ; les écarts nu à nu sont conservés et les largeurs automatiques suivent.
+ */
+export function majReseau(p: Projet, r: Reseau): Projet {
+  const avant = p.reseaux.find((x) => x.id === r.id);
+  const reseaux = p.reseaux.map((x) => (x.id === r.id ? r : x));
+  const e = r.enrobage;
+  if (avant && avant.enrobage.bas === e.bas && avant.enrobage.haut === e.haut && avant.enrobage.gauche === e.gauche && avant.enrobage.droite === e.droite) {
+    return { ...p, reseaux };
+  }
+  return {
+    ...p,
+    reseaux,
+    troncons: p.troncons.map((t) =>
+      t.tuyaux.some((x) => x.reseau === r.id)
+        ? ajusterLargeur({ ...t, tuyaux: t.tuyaux.map((x) => (x.reseau === r.id ? { ...x, enrobage: { ...e } } : x)) })
+        : t,
+    ),
+  };
+}
+
 /** Ajoute un réseau ; son fil d'eau aux regards part de celui du premier réseau, relevé de 30 cm */
 export function ajouterReseau(p: Projet): Projet {
   const nom = `Réseau ${p.reseaux.length + 1}`;
-  const r = nouveauReseau(nom, couleurPour(nom, p.reseaux.map((x) => x.couleur)));
+  const r = nouveauReseau(nom, couleurPour(nom, p.reseaux.map((x) => x.couleur)), p.reseaux[0]?.enrobage);
   const ref = p.reseaux[0].id;
   return {
     ...p,
@@ -363,11 +385,25 @@ export function normaliserProjet(brut: unknown): Projet {
     throw new Error('Le projet doit contenir au moins 2 regards et un tronçon entre chaque paire de regards.');
   }
 
+  const lireEnrobage = (e: Brut | undefined): Enrobage => ({
+    bas: nombre(e?.bas, ENROBAGE_DEFAUT.bas),
+    haut: nombre(e?.haut, ENROBAGE_DEFAUT.haut),
+    gauche: nombre(e?.gauche, ENROBAGE_DEFAUT.gauche),
+    droite: nombre(e?.droite, ENROBAGE_DEFAUT.droite),
+  });
+  /** Enrobage par réseau : celui du fichier, sinon (anciennes versions) celui du premier tuyau du réseau */
+  const enrobagesLus = new Map<string, Enrobage>();
   const reseaux: Reseau[] = [];
   for (const r of Array.isArray(o.reseaux) ? (o.reseaux as Brut[]) : []) {
     if (typeof r?.id !== 'string' || reseaux.some((x) => x.id === r.id)) continue;
     const nom = typeof r.nom === 'string' ? r.nom : `Réseau ${reseaux.length + 1}`;
-    reseaux.push({ id: r.id, nom, couleur: typeof r.couleur === 'string' ? r.couleur : couleurPour(nom, reseaux.map((x) => x.couleur)) });
+    reseaux.push({
+      id: r.id,
+      nom,
+      couleur: typeof r.couleur === 'string' ? r.couleur : couleurPour(nom, reseaux.map((x) => x.couleur)),
+      enrobage: { ...ENROBAGE_DEFAUT },
+    });
+    if (r.enrobage && typeof r.enrobage === 'object') enrobagesLus.set(r.id, lireEnrobage(r.enrobage));
   }
   if (reseaux.length === 0) reseaux.push(nouveauReseau('EU', COULEURS_RESEAUX[0]));
   const ref = reseaux[0].id;
@@ -418,18 +454,14 @@ export function normaliserProjet(brut: unknown): Projet {
         });
         reseau = res.id;
       }
+      if (!enrobagesLus.has(reseau)) enrobagesLus.set(reseau, lireEnrobage(p?.enrobage));
       return {
         id: typeof p?.id === 'string' ? p.id : nouvelId('tuyau'),
         reseau,
         diametre: nombre(p?.diametre, 0.315),
         paroi: nombre(p?.paroi, 0),
         position: nombre(p?.position, 0),
-        enrobage: {
-          bas: nombre(p?.enrobage?.bas, 0.1),
-          haut: nombre(p?.enrobage?.haut, 0.15),
-          gauche: nombre(p?.enrobage?.gauche, 0.15),
-          droite: nombre(p?.enrobage?.droite, 0.15),
-        },
+        enrobage: lireEnrobage(p?.enrobage),
       };
     }),
     couches: (Array.isArray(t?.couches) ? (t.couches as Brut[]) : []).map((c, i) => ({
@@ -441,6 +473,9 @@ export function normaliserProjet(brut: unknown): Projet {
     optionsDeblai: options(t?.optionsDeblai, base.optionsDeblai),
     optionsDecapage: options(t?.optionsDecapage, base.optionsDecapage),
   }));
+  // L'enrobage appartient au réseau : chaque tuyau reprend celui de son réseau
+  for (const r of reseaux) r.enrobage = { ...(enrobagesLus.get(r.id) ?? r.enrobage) };
+  for (const t of troncons) for (const x of t.tuyaux) x.enrobage = { ...reseaux.find((r) => r.id === x.reseau)!.enrobage };
   return {
     nom: typeof o.nom === 'string' ? o.nom : 'Projet',
     saisie: o.saisie === 'profondeurs' ? 'profondeurs' : 'altitudes',

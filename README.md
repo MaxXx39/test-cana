@@ -17,7 +17,8 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 ## Utilisation
 
 1. **Réseaux** (haut de la colonne de gauche) : déclarer les réseaux qui partagent la
-   tranchée (EU, EP…), chacun avec sa couleur.
+   tranchée (EU, EP…), chacun avec sa couleur et son enrobage (haut, lit de pose,
+   gauche, droite), appliqué à tous ses tuyaux dans tous les tronçons.
 2. **Tracé** : saisir les regards dans l’ordre et la longueur de chaque tronçon. À chaque
    regard, une ligne par réseau : la case indique que le réseau part vers le regard
    suivant, puis viennent son fil d’eau (ou sa profondeur) et le diamètre du tuyau vers

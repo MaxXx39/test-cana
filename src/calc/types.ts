@@ -9,6 +9,8 @@ export interface Reseau {
   id: string;
   nom: string;
   couleur: string;
+  /** Enrobage des tuyaux du réseau, commun à tous ses tronçons */
+  enrobage: Enrobage;
 }
 
 export interface Regard {
@@ -37,6 +39,7 @@ export interface Tuyau {
   paroi: number;
   /** Position de l'axe du tuyau par rapport à l'axe de la tranchée (négatif = à gauche) */
   position: number;
+  /** Copie de l'enrobage du réseau, tenue à jour par majReseau */
   enrobage: Enrobage;
 }
 

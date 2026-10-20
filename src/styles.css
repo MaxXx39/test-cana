@@ -1050,68 +1050,6 @@ polygon.couche {
   font-variant-numeric: tabular-nums;
 }
 
-.tuyau-detail {
-  margin-top: 0.4rem;
-}
-
-.tuyau-pied {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-
-.tuyau-pied .champ {
-  width: 110px;
-}
-
-.enrobage-croix {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-areas:
-    '. haut .'
-    'gauche centre droite'
-    '. bas .';
-  gap: 0.35rem 0.5rem;
-  margin-top: 0.6rem;
-  max-width: 380px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.enrobage-croix > :nth-child(1) {
-  grid-area: haut;
-}
-.enrobage-croix > :nth-child(2) {
-  grid-area: gauche;
-}
-.enrobage-croix > :nth-child(3) {
-  grid-area: centre;
-}
-.enrobage-croix > :nth-child(4) {
-  grid-area: droite;
-}
-.enrobage-croix > :nth-child(5) {
-  grid-area: bas;
-}
-
-.enrobage-centre {
-  align-self: center;
-  justify-self: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 4px solid var(--c-tuyau);
-  background: var(--c-tuyau-int);
-  display: grid;
-  place-items: center;
-  color: var(--c-tuyau);
-  font-weight: 700;
-  font-size: 0.75rem;
-}
-
 .ligne-couche {
   display: flex;
   align-items: center;
@@ -1671,11 +1609,6 @@ th {
   padding-right: 0.3rem;
 }
 
-.nf-coupe.nf-enrobage {
-  border-color: var(--c-enrobage-bord);
-  border-width: 1.5px;
-}
-
 .nf-coupe.nf-ecart {
   border-color: var(--poignee);
   border-width: 1.5px;
@@ -1733,4 +1666,74 @@ th {
 .legende-valeur {
   color: var(--texte-2);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Configuration des réseaux ---------- */
+.reseau-config {
+  border: 1px solid var(--bord);
+  border-left: 4px solid var(--bord-fort);
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.reseau-enrobage {
+  display: grid;
+  grid-template-columns: auto repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+  align-items: end;
+}
+
+.reseau-enrobage-titre {
+  font-size: 0.75rem;
+  color: var(--texte-2);
+  padding-bottom: 0.4rem;
+  white-space: nowrap;
+}
+
+.reseau-enrobage-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.reseau-enrobage-champ > span {
+  font-size: 0.7rem;
+  color: var(--texte-2);
+  text-align: center;
+}
+
+.nf.col-enrobage {
+  background: color-mix(in srgb, var(--c-enrobage) 35%, var(--panneau));
+  border-color: var(--c-enrobage-bord);
+}
+
+.nf.col-enrobage input {
+  text-align: center;
+  padding: 0.25rem 0.2rem;
+}
+
+.valeur-coupe rect {
+  fill: var(--panneau);
+  stroke: var(--c-enrobage-bord);
+  stroke-width: 1.2;
+  opacity: 0.92;
+}
+
+.valeur-coupe text {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+
+.tuyau-pied {
+  margin-top: 0.5rem;
+}
+
+.tuyau-pied .champ {
+  width: 110px;
 }

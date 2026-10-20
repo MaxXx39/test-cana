@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, section } from './engine';
 import {
   ajouterReseau,
+  majReseau,
   changerDiametre,
   changerEcart,
   dupliquerVers,
@@ -42,8 +43,8 @@ function projet(t: Troncon, H1: number, H2: number, ep: [number, number] = [100,
     nom: 't',
     saisie: 'altitudes',
     reseaux: [
-      { id: EU, nom: 'EU', couleur: '#000' },
-      { id: EP, nom: 'EP', couleur: '#00f' },
+      { id: EU, nom: 'EU', couleur: '#000', enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
+      { id: EP, nom: 'EP', couleur: '#00f', enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
     ],
     regards: [nouveauRegard('A', 100 + H1, { [EU]: 100, [EP]: ep[0] }), nouveauRegard('B', 100 + H2, { [EU]: 100, [EP]: ep[1] })],
     troncons: [t],
@@ -175,7 +176,7 @@ describe('trois réseaux ou plus', () => {
       ],
     });
     const p = projet(t, 2, 2, [100.4, 99.4]);
-    p.reseaux.push({ id: 'aep', nom: 'AEP', couleur: '#0a0' });
+    p.reseaux.push({ id: 'aep', nom: 'AEP', couleur: '#0a0', enrobage: tuyau.enrobage });
     p.regards[0].fe.aep = 99.7;
     p.regards[1].fe.aep = 100.2;
     const [ra, rb] = p.regards;
@@ -288,7 +289,7 @@ describe('édition du tracé et des réseaux', () => {
     const [eu, ep] = p.reseaux.map((r) => r.id);
     const t3 = p.troncons[2];
     expect(t3.tuyaux.map((x) => x.reseau)).toEqual([eu]);
-    const pose = poserReseau(t3, ep, diametreParDefaut(p, ep), [eu, ep]);
+    const pose = poserReseau(t3, p.reseaux[1], diametreParDefaut(p, ep), [eu, ep]);
     expect(pose.tuyaux.map((x) => x.reseau)).toEqual([eu, ep]);
     expect(pose.tuyaux[1].diametre).toBeCloseTo(0.4, 9);
     // côte à côte, centrés, tranchée élargie à la somme des largeurs d'enrobage
@@ -296,7 +297,7 @@ describe('édition du tracé et des réseaux', () => {
     expect(pose.tuyaux[0].position).toBeCloseTo(-0.35, 9);
     expect(pose.tuyaux[1].position).toBeCloseTo(0.25, 9);
     expect(pose.largeur).toBeCloseTo(0.5 + 0.7, 9);
-    expect(poserReseau(pose, ep, 0.3, [eu, ep])).toBe(pose);
+    expect(poserReseau(pose, p.reseaux[1], 0.3, [eu, ep])).toBe(pose);
     const retire = retirerReseauTroncon(pose, ep);
     expect(retire.tuyaux.map((x) => x.reseau)).toEqual([eu]);
     expect(retire.tuyaux[0].position).toBeCloseTo(0, 9);
@@ -357,6 +358,22 @@ describe('édition du tracé et des réseaux', () => {
       expect(r.troncons[i].tuyaux[0].id).not.toBe(source.tuyaux[0].id);
     }
     expect(r.troncons[1].longueur).toBe(42.5);
+  });
+
+  it('l’enrobage se règle par réseau et s’applique à tous ses tuyaux', () => {
+    const p = projetExemple();
+    const ep = p.reseaux[1];
+    const q = majReseau(p, { ...ep, enrobage: { bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 } });
+    const tuyauxEp = q.troncons.flatMap((t) => t.tuyaux.filter((x) => x.reseau === ep.id));
+    expect(tuyauxEp).toHaveLength(2);
+    for (const x of tuyauxEp) expect(x.enrobage).toEqual({ bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 });
+    // EU inchangé, écart nu à nu conservé, largeur automatique ajustée (+5 cm à gauche, +10 cm à droite)
+    expect(q.troncons[0].tuyaux.find((x) => x.reseau === p.reseaux[0].id)!.enrobage).toEqual(p.reseaux[0].enrobage);
+    expect(ecartsTuyaux(tuyauxGaucheDroite(q.troncons[0].tuyaux))[1]).toBeCloseTo(0.3, 9);
+    expect(q.troncons[0].largeur).toBeCloseTo(p.troncons[0].largeur + 0.1, 9);
+    // un nouveau tuyau EP prend l’enrobage du réseau
+    const t3 = poserReseau(q.troncons[2], q.reseaux[1], 0.4, q.reseaux.map((r) => r.id));
+    expect(t3.tuyaux.find((x) => x.reseau === ep.id)!.enrobage).toEqual(q.reseaux[1].enrobage);
   });
 
   it('ajouter puis supprimer un réseau', () => {

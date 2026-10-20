@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calculProjet } from './calc/engine';
-import { ajouterReseau, ajusterLargeur, dupliquerVers, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
+import { ajouterReseau, ajusterLargeur, dupliquerVers, majReseau, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
 import type { Projet, Reseau, Troncon } from './calc/types';
 import { CoupeTransversale, type ModeCoupe } from './components/CoupeTransversale';
 import { DetailTroncon, TableauTroncons, TotalGlobal } from './components/Resultats';
@@ -327,7 +327,7 @@ export default function App() {
               modifier((p) => insererRegard(p, i));
               setActif(Math.max(0, i - 1));
             }}
-            onReseau={(r) => modifier((p) => ({ ...p, reseaux: p.reseaux.map((x) => (x.id === r.id ? r : x)) }))}
+            onReseau={(r) => modifier((p) => majReseau(p, r))}
             onAjouterReseau={() => modifier(ajouterReseau)}
             onSupprimerReseau={retirerReseau}
             onSupprimer={(i) => {

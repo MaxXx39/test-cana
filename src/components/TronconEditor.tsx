@@ -61,7 +61,6 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
   const maj = (partiel: Partial<Troncon>) => onChange({ ...t, ...partiel });
   const majTuyau = (id: string, partiel: Partial<Tuyau>) =>
     maj({ tuyaux: t.tuyaux.map((p) => (p.id === id ? { ...p, ...partiel } : p)) });
-  const majEnrobage = (p: Tuyau, cote: keyof Tuyau['enrobage'], v: number) => majTuyau(p.id, { enrobage: { ...p.enrobage, [cote]: v } });
   const majCouche = (id: string, partiel: Partial<Couche>) =>
     maj({ couches: t.couches.map((c) => (c.id === id ? { ...c, ...partiel } : c)) });
   const deplacerCouche = (i: number, sens: -1 | 1) => {
@@ -81,7 +80,6 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
   const tries = tuyauxGaucheDroite(t.tuyaux);
   const ecarts = ecartsTuyaux(tries);
 
-  const enrobageATous = (e: Tuyau['enrobage']) => maj({ tuyaux: t.tuyaux.map((p) => ({ ...p, enrobage: { ...e } })) });
 
   return (
     <div className="editeur">
@@ -185,7 +183,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
 
       <section className="bloc-form">
         <div className="titre-actions">
-          <h3>Position et enrobage des tuyaux</h3>
+          <h3>Écarts entre tuyaux</h3>
           {t.tuyaux.length > 1 && (
             <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Écarts ramenés à des enrobages jointifs, tuyaux centrés">
               Enrobages jointifs
@@ -232,32 +230,13 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
                       FE {fmt(feA, 2)} → {fmt(feB, 2)} ·{' '}
                     </>
                   )}
-                  prof. {fmt(amont.tn - feA, 2)} → {fmt(aval.tn - feB, 2)} m
-                  {!sel && (
-                    <>
-                      {' '}
-                      · enrobage {cm(p.enrobage.bas)}/{cm(p.enrobage.gauche)}/{cm(p.enrobage.droite)}/{cm(p.enrobage.haut)} cm
-                    </>
-                  )}
+                  prof. {fmt(amont.tn - feA, 2)} → {fmt(aval.tn - feB, 2)} m · enrobage du réseau : haut {cm(p.enrobage.haut)}, lit{' '}
+                  {cm(p.enrobage.bas)}, côtés {cm(p.enrobage.gauche)}/{cm(p.enrobage.droite)} cm
                 </div>
                 {sel && (
                   <div className="tuyau-detail">
-                    <div className="enrobage-croix">
-                      <NumberField label="Haut" value={p.enrobage.haut} onChange={(v) => majEnrobage(p, 'haut', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-                      <NumberField label="Gauche" value={p.enrobage.gauche} onChange={(v) => majEnrobage(p, 'gauche', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-                      <span className="enrobage-centre" style={{ borderColor: res?.couleur, color: res?.couleur }} aria-hidden="true">
-                        {res?.nom}
-                      </span>
-                      <NumberField label="Droite" value={p.enrobage.droite} onChange={(v) => majEnrobage(p, 'droite', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-                      <NumberField label="Bas (lit)" value={p.enrobage.bas} onChange={(v) => majEnrobage(p, 'bas', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-                    </div>
                     <div className="tuyau-pied">
                       <NumberField label="Paroi" value={p.paroi} onChange={(v) => majTuyau(p.id, { paroi: v })} echelle={1000} decimales={0} unite="mm" min={0} pas={1} title="Écart entre fil d’eau et génératrice inférieure extérieure" />
-                      {t.tuyaux.length > 1 && (
-                        <button type="button" className="btn btn-leger btn-petit" onClick={() => enrobageATous(p.enrobage)}>
-                          Même enrobage pour tous
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -268,7 +247,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
         {t.tuyaux.length > 0 && (
           <p className="aide">
             Tuyaux de gauche à droite. L’écart est la distance nu à nu (paroi à paroi) avec le tuyau de gauche, coté en orange sur la coupe.
-            Cliquez un tuyau pour régler son enrobage ; réseaux, diamètres et profondeurs se saisissent dans le Tracé.
+            L’enrobage se règle par réseau, en haut du Tracé ; réseaux, diamètres et profondeurs se saisissent aussi dans le Tracé.
           </p>
         )}
       </section>

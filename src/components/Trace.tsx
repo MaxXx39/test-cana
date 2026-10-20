@@ -72,7 +72,8 @@ export function Trace({
         {reseaux.map((r) => {
           const n = troncons.filter((t) => pose(t, r.id)).length;
           return (
-            <div key={r.id} className="reseau-ligne">
+            <div key={r.id} className="reseau-config" style={{ borderLeftColor: r.couleur }}>
+            <div className="reseau-ligne">
               <button
                 type="button"
                 className="pastille-bouton"
@@ -101,6 +102,32 @@ export function Trace({
               >
                 ×
               </button>
+            </div>
+            <div className="reseau-enrobage" role="group" aria-label={`Enrobage du réseau ${r.nom}`}>
+              <span className="reseau-enrobage-titre">Enrobage (cm)</span>
+              {(
+                [
+                  ['haut', 'Haut'],
+                  ['bas', 'Lit'],
+                  ['gauche', 'Gauche'],
+                  ['droite', 'Droite'],
+                ] as const
+              ).map(([cote, lib]) => (
+                <label key={cote} className="reseau-enrobage-champ">
+                  <span>{lib}</span>
+                  <NumberField
+                    value={r.enrobage[cote]}
+                    onChange={(v) => onReseau({ ...r, enrobage: { ...r.enrobage, [cote]: Math.max(0, v) } })}
+                    echelle={100}
+                    decimales={1}
+                    min={0}
+                    pas={1}
+                    className="col-enrobage"
+                    title={`Enrobage ${cote === 'bas' ? 'bas (lit de pose)' : cote} du réseau ${r.nom}, en cm`}
+                  />
+                </label>
+              ))}
+            </div>
             </div>
           );
         })}
@@ -173,7 +200,7 @@ export function Trace({
                         type="checkbox"
                         checked={!!tuyauAval}
                         onChange={(e) =>
-                          onTroncon(i, e.target.checked ? poserReseau(t, x.id, diametreParDefaut(projet, x.id), ordre) : retirerReseauTroncon(t, x.id))
+                          onTroncon(i, e.target.checked ? poserReseau(t, x, diametreParDefaut(projet, x.id), ordre) : retirerReseauTroncon(t, x.id))
                         }
                         title={`${x.nom} posé de ${r.nom} vers ${regards[i + 1].nom}`}
                         aria-label={`${x.nom} posé de ${r.nom} vers ${regards[i + 1].nom}`}

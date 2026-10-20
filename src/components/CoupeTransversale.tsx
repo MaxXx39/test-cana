@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
 import { changerEcart, ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
-import type { ModeSaisie, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
+import type { ModeSaisie, Regard, Reseau, Troncon } from '../calc/types';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -181,9 +181,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     ]);
 
   // ----- Saisie sur la coupe -----
-  const majTuyau = (id: string, maj: (p: Tuyau) => Tuyau) => onChange({ ...t, tuyaux: t.tuyaux.map((p) => (p.id === id ? maj(p) : p)) });
-  const majEnrobage = (id: string, cote: keyof Tuyau['enrobage'], v: number) =>
-    majTuyau(id, (p) => ({ ...p, enrobage: { ...p.enrobage, [cote]: Math.max(0, v) } }));
   const majCouche = (i: number, v: number) =>
     onChange({ ...t, couches: t.couches.map((c, j) => (j === i ? { ...c, epaisseur: Math.max(0, v) } : c)) });
 
@@ -347,7 +344,19 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     }
   }
 
-  /** Les quatre épaisseurs d'enrobage d'un tuyau, saisies autour de son bloc */
+  /** Valeur en lecture seule posée sur le dessin (pastille) */
+  const VAL_L = 44;
+  const valeur = (cle: string, x: number, y: number, v: number, titre: string): ReactNode => (
+    <g key={cle} className="valeur-coupe">
+      <title>{titre}</title>
+      <rect x={x - VAL_L / 2} y={y - 9} width={VAL_L} height={18} rx={4} />
+      <text x={x} y={y + 4} textAnchor="middle">
+        {fmt(v * 100, v * 100 < 10 ? 1 : 0)} cm
+      </text>
+    </g>
+  );
+
+  /** Les quatre épaisseurs d'enrobage d'un tuyau (réglées dans la configuration du réseau), autour de son bloc */
   const enrobageSurCoupe = (g: (typeof geoms)[number]) => {
     const { bloc, cx: gx, cy: gy, r } = g;
     const id = g.tuyau.id;
@@ -357,16 +366,17 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     const bandeBas = (gy - r - bloc.y0) * s;
     const bandeG = (gx - r - bloc.x0) * s;
     const bandeD = (bloc.x1 - (gx + r)) * s;
-    const yH = bandeHaut >= CHAMP_H + 2 ? Yy((gy + r + yHaut) / 2) : Yy(yHaut) - CHAMP_H / 2 - 2;
-    const yB = bandeBas >= CHAMP_H + 2 ? Yy((bloc.y0 + gy - r) / 2) : Yy(bloc.y0) + CHAMP_H / 2 + 2;
-    const xG = bandeG >= CHAMP_L + 2 ? X((bloc.x0 + gx - r) / 2) : X(bloc.x0) - CHAMP_L / 2 - 2;
-    const xD = bandeD >= CHAMP_L + 2 ? X((gx + r + bloc.x1) / 2) : X(bloc.x1) + CHAMP_L / 2 + 2;
+    const yH = bandeHaut >= 20 ? Yy((gy + r + yHaut) / 2) : Yy(yHaut) - 11;
+    const yB = bandeBas >= 20 ? Yy((bloc.y0 + gy - r) / 2) : Yy(bloc.y0) + 11;
+    const xG = bandeG >= VAL_L + 2 ? X((bloc.x0 + gx - r) / 2) : X(bloc.x0) - VAL_L / 2 - 2;
+    const xD = bandeD >= VAL_L + 2 ? X((gx + r + bloc.x1) / 2) : X(bloc.x1) + VAL_L / 2 + 2;
+    const aide = `(se règle dans Réseaux)`;
     return (
-      <g className="enrobage-saisie">
-        {champ(`eh-${id}`, X(gx), yH, g.tuyau.enrobage.haut, (v) => majEnrobage(id, 'haut', v), `Enrobage haut ${nom}`, 'nf-enrobage')}
-        {champ(`eb-${id}`, X(gx), yB, g.tuyau.enrobage.bas, (v) => majEnrobage(id, 'bas', v), `Enrobage bas (lit de pose) ${nom}`, 'nf-enrobage')}
-        {champ(`eg-${id}`, xG, Yy(gy), g.tuyau.enrobage.gauche, (v) => majEnrobage(id, 'gauche', v), `Enrobage gauche ${nom}`, 'nf-enrobage')}
-        {champ(`ed-${id}`, xD, Yy(gy), g.tuyau.enrobage.droite, (v) => majEnrobage(id, 'droite', v), `Enrobage droit ${nom}`, 'nf-enrobage')}
+      <g className="enrobage-valeurs">
+        {valeur(`eh-${id}`, X(gx), yH, g.tuyau.enrobage.haut, `Enrobage haut ${nom} ${aide}`)}
+        {valeur(`eb-${id}`, X(gx), yB, g.tuyau.enrobage.bas, `Lit de pose ${nom} ${aide}`)}
+        {valeur(`eg-${id}`, xG, Yy(gy), g.tuyau.enrobage.gauche, `Enrobage gauche ${nom} ${aide}`)}
+        {valeur(`ed-${id}`, xD, Yy(gy), g.tuyau.enrobage.droite, `Enrobage droit ${nom} ${aide}`)}
       </g>
     );
   };
@@ -588,7 +598,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           </text>
         </g>
 
-        {/* Enrobage du tuyau sélectionné, saisi sur la coupe */}
+        {/* Enrobage du tuyau sélectionné, affiché sur la coupe */}
         {selectionne && !gab.compact && enrobageSurCoupe(selectionne)}
       </svg>
       {tuyauxListe.length > 0 && (
@@ -620,22 +630,10 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           <strong>
             {reseau(selectionne.tuyau.reseau)?.nom} Ø{fmt(selectionne.tuyau.diametre * 1000, 0)}
           </strong>
-          <span>enrobage</span>
-          {(['haut', 'bas', 'gauche', 'droite'] as const).map((c) => (
-            <label key={c} className="saisie-tuyau-champ">
-              {c === 'bas' ? 'bas (lit)' : c}
-              <NumberField
-                value={selectionne.tuyau.enrobage[c]}
-                onChange={(v) => majEnrobage(selectionne.tuyau.id, c, v)}
-                echelle={100}
-                decimales={1}
-                unite="cm"
-                min={0}
-                pas={1}
-                className="nf-coupe"
-              />
-            </label>
-          ))}
+          <span title="Se règle dans la configuration des réseaux">
+            enrobage haut {fmt(selectionne.tuyau.enrobage.haut * 100, 0)} · lit {fmt(selectionne.tuyau.enrobage.bas * 100, 0)} · gauche{' '}
+            {fmt(selectionne.tuyau.enrobage.gauche * 100, 0)} · droite {fmt(selectionne.tuyau.enrobage.droite * 100, 0)} cm
+          </span>
           {(() => {
             const k = tries.findIndex((x) => x.id === selectionne.tuyau.id);
             if (k <= 0) return null;
