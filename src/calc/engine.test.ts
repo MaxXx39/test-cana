@@ -155,6 +155,35 @@ describe('plusieurs réseaux dans la tranchée', () => {
   });
 });
 
+describe('trois réseaux ou plus', () => {
+  it('le fond suit le plus profond des trois, y compris quand ils se croisent', () => {
+    const t = tronconNu({
+      largeur: 3,
+      tuyaux: [
+        { ...tuyau, id: 'a', position: -1 },
+        { ...tuyau, id: 'b', reseau: EP, position: 0 },
+        { ...tuyau, id: 'c', reseau: 'aep', position: 1 },
+      ],
+    });
+    const p = projet(t, 2, 2, [100.4, 99.4]);
+    p.reseaux.push({ id: 'aep', nom: 'AEP', couleur: '#0a0' });
+    p.regards[0].fe.aep = 99.7;
+    p.regards[1].fe.aep = 100.2;
+    const [ra, rb] = p.regards;
+    // fond = min des trois lits : (AEP, EU puis EP prennent tour à tour le dessus)
+    const n = 4000;
+    let hMoyen = 0;
+    for (let i = 0; i < n; i++) hMoyen += etatCoupe(t, ra, rb, (i + 0.5) / n).H / n;
+    const r = calculTroncon(p, 0);
+    expect(r.fouille).toBeCloseTo(10 * 3 * hMoyen, 4);
+    expect(r.H1).toBeCloseTo(102 - 99.6, 9);
+    expect(r.H2).toBeCloseTo(102 - 99.3, 9);
+    expect(r.canalisations.map((c) => c.nom)).toEqual(['EU', 'EP', 'AEP']);
+    const structure = r.couches.reduce((a, c) => a + c.volume, 0);
+    expect(r.enrobage + r.tuyaux + structure + r.remblai).toBeCloseTo(r.fouille, 6);
+  });
+});
+
 describe('structure et décapage', () => {
   it('épaisseur × largeur × longueur en U', () => {
     const t = tronconNu({

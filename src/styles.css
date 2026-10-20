@@ -926,10 +926,6 @@ polygon.couche {
   stroke: var(--poignee);
 }
 
-.etiquette-forte {
-  font-weight: 600;
-}
-
 .etiquette-pastille.et-remblai {
   fill: var(--c-remblai);
 }
@@ -959,11 +955,6 @@ polygon.couche {
 }
 .etiquette-pastille.et-couche-5 {
   fill: var(--c-couche-5);
-}
-
-.legende li[style]::before {
-  background: var(--pastille);
-  border-radius: 50%;
 }
 
 /* ---------- Éditeur ---------- */
@@ -1437,4 +1428,53 @@ th {
   padding: 0.3rem 0;
   font-variant-numeric: tabular-nums;
   color: var(--texte-2);
+}
+
+.tuyau-texte-ext {
+  font-size: 10.5px;
+  paint-order: stroke;
+  stroke: var(--panneau);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.liste-reseaux-coupe {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.liste-reseaux-coupe button {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.55rem;
+  border: 1px solid var(--bord);
+  border-left: 4px solid var(--pastille);
+  border-radius: 6px;
+  background: var(--panneau);
+  color: var(--texte);
+  cursor: pointer;
+  text-align: left;
+}
+
+.liste-reseaux-coupe button strong {
+  color: var(--pastille);
+  font-size: 0.88rem;
+}
+
+.liste-reseaux-coupe button span {
+  font-size: 0.78rem;
+  color: var(--texte-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.liste-reseaux-coupe button.actif {
+  box-shadow: 0 0 0 1.5px var(--poignee);
 }

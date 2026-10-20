@@ -89,10 +89,8 @@ interface Etiquette {
   ancreX: number;
   ancreY: number;
   texte: string;
-  /** Pastille : classe de matériau, ou couleur de réseau */
-  classe?: string;
-  couleur?: string;
-  fort?: boolean;
+  /** Classe du matériau, pour la pastille */
+  classe: string;
 }
 
 export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onChange, selection, onSelect }: Props) {
@@ -135,7 +133,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
   const calcul = miseEnPage(gab, largeurMonde, profondeurMax);
   const m = gel ?? calcul;
   const { s, cx } = m;
-  const vbh = Math.max(m.vbh, calcul.vbh);
 
   const X = (x: number) => cx + x * s;
   /** depuis une profondeur sous TN */
@@ -143,6 +140,14 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
   /** depuis une hauteur au-dessus du fond */
   const Yy = (y: number) => TOP + (H - y) * s;
   const hw = (z: number) => W / 2 + f * (H - z);
+
+  const LIGNE_FE = 14;
+  const basJauges =
+    Math.max(...[amont, aval].map((r, k) => Math.max(...reseauxRegard.map((x) => Yz(Math.max(0, r.tn - filDEauRegard(r, x.id))) + 6), Yz(k ? H2 : H1)))) +
+    16 +
+    reseauxRegard.length * LIGNE_FE +
+    (gab.compact ? 4 : 20);
+  const vbh = Math.max(m.vbh, calcul.vbh, basJauges);
 
   const poly = (pts: number[][]) => pts.map((p) => p.join(',')).join(' ');
   const tranchee = poly([
@@ -264,18 +269,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
       classe: 'et-remblai',
     });
   }
-  for (const g of geoms) {
-    const fe = filDEauTuyau(g.tuyau, amont, aval, u);
-    const nom = reseau(g.tuyau.reseau)?.nom ?? '?';
-    etiquettes.push({
-      y: Yy(g.cy),
-      ancreX: X(g.cx + g.r),
-      ancreY: Yy(g.cy),
-      texte: `${nom} Ø${fmt(g.tuyau.diametre * 1000, 0)} · FE ${fmt(fe, 2)} · prof. ${fmt(tn - fe, 2)} m`,
-      couleur: couleur(g.tuyau.reseau),
-      fort: true,
-    });
-  }
+  // Les tuyaux portent leur nom sur le dessin ; leur détail est listé sous la coupe, de gauche à droite.
+  const tuyauxListe = [...geoms].sort((a, b) => a.cx - b.cx);
   if (geoms.length) {
     const ym = Math.min(...geoms.map((g) => g.bloc.y0)) + 0.03;
     const droite = Math.max(...geoms.map((g) => g.bloc.x1));
@@ -308,6 +303,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
       return { res, fe, D: Math.max(0, r.tn - fe), xc: x0 + 6 + pas * (k + 0.5) };
     });
     const yTexteFe = Math.max(...puits.map((p) => Yz(p.D) + 6), Yz(Math.max(0, Hr))) + 16;
+    const largeurTexte = (texte: string) => texte.length * (gab.compact ? 5.6 : 6.8) + 6;
     return (
       <g className={`jauge ${actif ? 'jauge-active' : ''} ${gab.compact ? 'jauge-compacte' : ''}`}>
         <text x={x0 + JAUGE / 2} y={18} className="jauge-titre" textAnchor="middle">
@@ -326,10 +322,12 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
             <title>{`${p.res.nom} : FE ${fmt(p.fe, 2)} · profondeur ${fmt(p.D, 2)} m`}</title>
             <rect x={p.xc - lp / 2} y={Yz(0)} width={lp} height={p.D * s} className="jauge-puits" />
             <rect x={p.xc - lp / 2 - 4} y={Yz(p.D)} width={lp + 8} height={6} className="jauge-radier" />
-            <text x={p.xc} y={Yz(0) + 14} textAnchor="middle" className="jauge-reseau">
-              {p.res.nom}
-            </text>
-            {!gab.compact && p.D * s > 70 && (
+            {largeurTexte(p.res.nom) <= lp && (
+              <text x={p.xc} y={Yz(0) + 14} textAnchor="middle" className="jauge-reseau">
+                {p.res.nom}
+              </text>
+            )}
+            {!gab.compact && p.D * s > 70 && lp >= 14 && (
               <text
                 x={p.xc}
                 y={Yz(p.D / 2) + 14}
@@ -340,15 +338,19 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
                 {fmt(p.D, 2)} m
               </text>
             )}
-            {!gab.compact && (
-              <text x={p.xc} y={yTexteFe} textAnchor="middle" className="jauge-fe">
-                {fmt(p.fe, 2)}
-              </text>
-            )}
+          </g>
+        ))}
+        {/* Fils d'eau listés sous le regard, une ligne par réseau */}
+        {puits.map((p, k) => (
+          <g key={`fe-${p.res.id}`} style={{ color: p.res.couleur }}>
+            <circle cx={x0 + 10} cy={yTexteFe + k * LIGNE_FE - 4} r={4} className="jauge-radier" />
+            <text x={x0 + 18} y={yTexteFe + k * LIGNE_FE} className="jauge-fe">
+              {gab.compact ? fmt(p.fe, 2) : `${p.res.nom} ${fmt(p.fe, 2)}`}
+            </text>
           </g>
         ))}
         {!gab.compact && (
-          <text x={x0 + JAUGE / 2} y={yTexteFe + 16} className="jauge-fouille" textAnchor="middle">
+          <text x={x0 + 6} y={yTexteFe + n * LIGNE_FE + 4} className="jauge-fouille">
             fouille {fmt(Hr, 2)} m
           </text>
         )}
@@ -357,6 +359,28 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
   };
 
   const selectionne = geoms.find((g) => g.tuyau.id === selection);
+
+  // Nom du réseau dans le tuyau s'il y tient, sinon au-dessus, à condition de ne pas
+  // chevaucher un autre nom (sinon la couleur et la liste sous la coupe suffisent).
+  const nomsTuyaux = new Map<string, 'dedans' | 'dessus'>();
+  const boites: [number, number, number][] = [];
+  for (const g of geoms) {
+    const nom = reseau(g.tuyau.reseau)?.nom ?? '';
+    const largeur = nom.length * 6.6 + 4;
+    if (2 * (g.r * s - Math.max(3, g.tuyau.paroi * s)) >= largeur) {
+      nomsTuyaux.set(g.tuyau.id, 'dedans');
+      continue;
+    }
+    if (gab.compact) continue;
+    const y = Yy(g.cy + g.r) - 5;
+    const b: [number, number, number] = [X(g.cx) - largeur / 2, X(g.cx) + largeur / 2, y];
+    const libre = boites.every(([a0, a1, ay]) => Math.abs(ay - y) > 12 || b[1] < a0 || b[0] > a1);
+    const surTuyau = geoms.some((o) => o !== g && Math.hypot(X(o.cx) - X(g.cx), Yy(o.cy) - y) < o.r * s + 6);
+    if (libre && !surTuyau) {
+      boites.push(b);
+      nomsTuyaux.set(g.tuyau.id, 'dessus');
+    }
+  }
 
   return (
     <div ref={boiteRef} className="coupe-boite">
@@ -453,8 +477,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
               {sel && <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s + 4} className="tuyau-halo" />}
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s} className="tuyau-paroi" />
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={Math.max(1, g.r * s - ep)} className="tuyau-int" />
-              {g.r * s > 15 && (
-                <text x={X(g.cx)} y={Yy(g.cy) + 4} textAnchor="middle" className="tuyau-texte">
+              {nomsTuyaux.has(g.tuyau.id) && (
+                <text
+                  x={X(g.cx)}
+                  y={nomsTuyaux.get(g.tuyau.id) === 'dedans' ? Yy(g.cy) + 4 : Yy(g.cy + g.r) - 5}
+                  textAnchor="middle"
+                  className={`tuyau-texte ${nomsTuyaux.get(g.tuyau.id) === 'dedans' ? '' : 'tuyau-texte-ext'}`}
+                >
                   {reseau(g.tuyau.reseau)?.nom}
                 </text>
               )}
@@ -497,15 +526,11 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
         {/* Étiquettes */}
         {!gab.compact &&
           etiquettes.map((e, i) => (
-            <g key={i} className={`etiquette ${e.classe ?? ''}`}>
+            <g key={i} className={`etiquette ${e.classe}`}>
               <polyline points={`${e.ancreX + 2},${e.ancreY} ${m.xEtiquettes - 8},${e.y} ${m.xEtiquettes - 2},${e.y}`} className="etiquette-trait" />
               <circle cx={e.ancreX + 2} cy={e.ancreY} r={2} className="etiquette-point" />
-              {e.couleur ? (
-                <circle cx={m.xEtiquettes + 5} cy={e.y} r={5} fill={e.couleur} />
-              ) : (
-                <rect x={m.xEtiquettes} y={e.y - 5} width={10} height={10} rx={2} className={`etiquette-pastille ${e.classe}`} />
-              )}
-              <text x={m.xEtiquettes + 16} y={e.y + 4} className={`etiquette-texte ${e.fort ? 'etiquette-forte' : ''}`}>
+              <rect x={m.xEtiquettes} y={e.y - 5} width={10} height={10} rx={2} className={`etiquette-pastille ${e.classe}`} />
+              <text x={m.xEtiquettes + 16} y={e.y + 4} className="etiquette-texte">
                 {e.texte}
               </text>
             </g>
@@ -538,10 +563,34 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
           </>
         )}
       </svg>
+      {tuyauxListe.length > 0 && (
+        <ul className="liste-reseaux-coupe" aria-label="Tuyaux de la coupe, de gauche à droite">
+          {tuyauxListe.map((g) => {
+            const fe = filDEauTuyau(g.tuyau, amont, aval, u);
+            return (
+              <li key={g.tuyau.id}>
+                <button
+                  type="button"
+                  className={g.tuyau.id === selection ? 'actif' : ''}
+                  style={{ '--pastille': couleur(g.tuyau.reseau) } as CSSProperties}
+                  onClick={() => onSelect(g.tuyau.id)}
+                >
+                  <strong>
+                    {reseau(g.tuyau.reseau)?.nom} Ø{fmt(g.tuyau.diametre * 1000, 0)}
+                  </strong>
+                  <span>
+                    FE {fmt(fe, 2)} · prof. {fmt(tn - fe, 2)} m
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {gab.compact && (
         <ul className="legende">
           {etiquettes.map((e, i) => (
-            <li key={i} className={e.classe} style={e.couleur ? ({ '--pastille': e.couleur } as CSSProperties) : undefined}>
+            <li key={i} className={e.classe}>
               {e.texte}
             </li>
           ))}
