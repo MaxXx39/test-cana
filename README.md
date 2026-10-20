@@ -18,9 +18,10 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 
 1. **Réseaux** (haut de la colonne de gauche) : déclarer les réseaux qui partagent la
    tranchée (EU, EP…), chacun avec sa couleur.
-2. **Tracé** : saisir les regards dans l’ordre et la longueur de chaque tronçon. Dans
-   chaque tronçon, cocher les réseaux posés et saisir leur diamètre. À chaque regard, on
-   renseigne les réseaux posés de part et d’autre, au choix :
+2. **Tracé** : saisir les regards dans l’ordre et la longueur de chaque tronçon. À chaque
+   regard, une ligne par réseau : la case indique que le réseau part vers le regard
+   suivant, puis viennent son fil d’eau (ou sa profondeur) et le diamètre du tuyau vers
+   l’aval. Deux modes de saisie :
    - **TN + FE** : altitude du terrain naturel et fil d’eau de chaque réseau ;
    - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
      volumes ne dépendent que des profondeurs).

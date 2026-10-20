@@ -571,10 +571,46 @@ h3 {
 
 .regard-fe {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) 108px 52px;
-  gap: 0.35rem;
+  grid-template-columns: 16px 10px minmax(0, 1fr) 84px 64px 36px;
+  gap: 0.3rem;
   align-items: center;
-  padding-right: 28px;
+}
+
+.regard-fe input[type='checkbox'] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.regard-fe .nf input {
+  padding-left: 0.25rem;
+  padding-right: 0.35rem;
+}
+
+.regard-fe-vide .regard-fe-nom {
+  color: var(--texte-2);
+}
+
+.regard-fe-vide .pastille-reseau {
+  opacity: 0.5;
+}
+
+.regard-fe-tiret {
+  text-align: center;
+  color: var(--bord-fort);
+}
+
+.regard-fe-entete {
+  font-size: 0.72rem;
+  color: var(--texte-2);
+  padding: 0 0.45rem 0.2rem;
+}
+
+.regard-fe-entete span:nth-child(4),
+.regard-fe-entete span:nth-child(5) {
+  text-align: right;
+  padding-right: 0.35rem;
 }
 
 .regard-fe-nom {
@@ -625,45 +661,6 @@ h3 {
   grid-template-columns: minmax(0, 1fr) 96px 28px;
   gap: 0.3rem;
   align-items: center;
-}
-
-.troncon-tuyaux {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.tuyau-choix {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 28px;
-  gap: 0.3rem;
-  align-items: center;
-  min-height: 30px;
-}
-
-.tuyau-choix .case {
-  min-width: 0;
-  font-size: 0.85rem;
-  color: var(--texte-2);
-}
-
-.tuyau-choix-pose .case {
-  color: var(--texte);
-  font-weight: 600;
-}
-
-.tuyau-choix-nom {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tuyau-choix-vide {
-  font-size: 0.78rem;
-  font-style: italic;
-  color: var(--texte-2);
-  text-align: right;
-  padding-right: 0.45rem;
 }
 
 .troncon-actif {

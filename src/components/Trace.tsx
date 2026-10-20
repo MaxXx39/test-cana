@@ -45,10 +45,14 @@ export function Trace({
   const { reseaux, regards, troncons, saisie } = projet;
   const ordre = reseaux.map((r) => r.id);
   const pose = (t: Troncon | undefined, id: string) => !!t?.tuyaux.some((p) => p.reseau === id);
-  /** Réseaux à renseigner au regard i : ceux posés dans les tronçons voisins */
-  const reseauxAuRegard = (i: number) => {
-    const liste = reseaux.filter((x) => pose(troncons[i - 1], x.id) || pose(troncons[i], x.id));
-    return liste.length ? liste : reseaux.slice(0, 1);
+  /**
+   * Lignes du regard i : tous les réseaux (pour pouvoir les poser vers l'aval), sauf au
+   * dernier regard où seuls comptent ceux qui arrivent de l'amont.
+   */
+  const lignesRegard = (i: number) => {
+    if (i < troncons.length) return reseaux;
+    const arrivent = reseaux.filter((x) => pose(troncons[i - 1], x.id));
+    return arrivent.length ? arrivent : reseaux.slice(0, 1);
   };
 
   return (
@@ -114,10 +118,17 @@ export function Trace({
         </div>
       </div>
       <p className="aide">
-        {saisie === 'altitudes'
-          ? 'Altitudes en m NGF, dans l’ordre du tracé. Cochez les réseaux posés dans chaque tronçon.'
-          : 'Profondeur TN − fil d’eau en m, dans l’ordre du tracé. Cochez les réseaux posés dans chaque tronçon.'}
+        Dans l’ordre du tracé. À chaque regard, une ligne par réseau : cochez-le s’il part vers le regard suivant, puis saisissez son{' '}
+        {saisie === 'altitudes' ? 'fil d’eau (m NGF)' : 'profondeur TN − fil d’eau (m)'} et le diamètre du tuyau vers l’aval.
       </p>
+      <div className="regard-fe regard-fe-entete" aria-hidden="true">
+        <span title="Posé vers l’aval">↓</span>
+        <span />
+        <span>Réseau</span>
+        <span>{saisie === 'altitudes' ? 'FE (m)' : 'Prof. (m)'}</span>
+        <span>Ø (mm)</span>
+        <span className="num">{saisie === 'altitudes' ? 'Prof.' : ''}</span>
+      </div>
 
       {regards.map((r, i) => {
         const t = troncons[i];
@@ -144,35 +155,58 @@ export function Trace({
                   ×
                 </button>
               </div>
-              {reseauxAuRegard(i).map((x) => {
+              {lignesRegard(i).map((x) => {
                 const fe = r.fe[x.id];
                 const prof = r.tn - fe;
+                const tuyauAval = t?.tuyaux.find((p) => p.reseau === x.id);
+                const poseAmont = pose(troncons[i - 1], x.id);
+                const utile = !!tuyauAval || poseAmont;
                 return (
-                  <div key={x.id} className="regard-fe">
-                    <PastilleReseau couleur={x.couleur} />
-                    <span className="regard-fe-nom">
-                      {saisie === 'altitudes' ? 'FE' : 'Prof.'} {x.nom}
-                    </span>
-                    {saisie === 'altitudes' ? (
-                      <>
-                        <NumberField value={fe} onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })} decimales={2} pas={0.01} unite="m" title={`Fil d’eau ${x.nom}`} />
-                        <span className={`num prof ${prof <= 0 ? 'alerte-texte' : ''}`} title="Profondeur TN − FE">
-                          {fmt(prof, 2)} m
-                        </span>
-                      </>
+                  <div key={x.id} className={`regard-fe ${utile ? '' : 'regard-fe-vide'}`}>
+                    {t ? (
+                      <input
+                        type="checkbox"
+                        checked={!!tuyauAval}
+                        onChange={(e) =>
+                          onTroncon(i, e.target.checked ? poserReseau(t, x.id, diametreParDefaut(projet, x.id), ordre) : retirerReseauTroncon(t, x.id))
+                        }
+                        title={`${x.nom} posé de ${r.nom} vers ${regards[i + 1].nom}`}
+                        aria-label={`${x.nom} posé de ${r.nom} vers ${regards[i + 1].nom}`}
+                      />
                     ) : (
-                      <>
-                        <NumberField
-                          value={prof}
-                          onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: r.tn - v } })}
-                          decimales={2}
-                          pas={0.01}
-                          unite="m"
-                          title={`Profondeur ${x.nom} (TN − fil d’eau)`}
-                        />
-                        <span />
-                      </>
+                      <span />
                     )}
+                    <PastilleReseau couleur={x.couleur} />
+                    <span className="regard-fe-nom">{x.nom}</span>
+                    {!utile ? (
+                      <span className="regard-fe-tiret">—</span>
+                    ) : saisie === 'altitudes' ? (
+                      <NumberField value={fe} onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })} decimales={2} pas={0.01} title={`Fil d’eau ${x.nom} au regard ${r.nom} (m)`} />
+                    ) : (
+                      <NumberField
+                        value={prof}
+                        onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: r.tn - v } })}
+                        decimales={2}
+                        pas={0.01}
+                        title={`Profondeur ${x.nom} au regard ${r.nom} (m)`}
+                      />
+                    )}
+                    {tuyauAval ? (
+                      <NumberField
+                        value={tuyauAval.diametre}
+                        onChange={(v) => onTroncon(i, changerDiametre(t!, x.id, v))}
+                        echelle={1000}
+                        decimales={0}
+                        min={10}
+                        pas={10}
+                        title={`Diamètre extérieur ${x.nom} de ${r.nom} vers ${regards[i + 1].nom} (mm)`}
+                      />
+                    ) : (
+                      <span className="regard-fe-tiret">—</span>
+                    )}
+                    <span className={`num prof ${utile && prof <= 0 ? 'alerte-texte' : ''}`} title="Profondeur TN − FE">
+                      {utile && saisie === 'altitudes' ? fmt(prof, 2) : ''}
+                    </span>
                   </div>
                 );
               })}
@@ -191,41 +225,6 @@ export function Trace({
                   <button type="button" className="btn-icone" onClick={() => onInserer(i + 1)} title="Insérer un regard dans ce tronçon" aria-label="Insérer un regard">
                     +
                   </button>
-                </div>
-                <div className="troncon-tuyaux">
-                  {reseaux.map((x) => {
-                    const tuyau = t.tuyaux.find((p) => p.reseau === x.id);
-                    return (
-                      <div key={x.id} className={`tuyau-choix ${tuyau ? 'tuyau-choix-pose' : ''}`}>
-                        <label className="case">
-                          <input
-                            type="checkbox"
-                            checked={!!tuyau}
-                            onChange={(e) =>
-                              onTroncon(i, e.target.checked ? poserReseau(t, x.id, diametreParDefaut(projet, x.id), ordre) : retirerReseauTroncon(t, x.id))
-                            }
-                            aria-label={`Réseau ${x.nom} posé dans le tronçon ${i + 1}`}
-                          />
-                          <PastilleReseau couleur={x.couleur} />
-                          <span className="tuyau-choix-nom">{x.nom}</span>
-                        </label>
-                        {tuyau ? (
-                          <NumberField
-                            value={tuyau.diametre}
-                            onChange={(v) => onTroncon(i, changerDiametre(t, x.id, v))}
-                            echelle={1000}
-                            decimales={0}
-                            unite="mm"
-                            min={10}
-                            pas={10}
-                            title={`Diamètre extérieur ${x.nom}`}
-                          />
-                        ) : (
-                          <span className="tuyau-choix-vide">non posé</span>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
             )}
