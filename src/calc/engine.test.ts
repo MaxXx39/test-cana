@@ -6,6 +6,7 @@ import {
   propagerTranchees,
   changerDiametre,
   changerEcart,
+  deplacerTuyau,
   dupliquerVers,
   ecartsTuyaux,
   tuyauxGaucheDroite,
@@ -442,6 +443,19 @@ describe('édition du tracé et des réseaux', () => {
     const chaine = propagerTranchees({ ...lie, troncons: lie.troncons.map((t, i) => (i === 1 ? { ...t, commePrecedent: true, blindage: 0.2 } : t)) });
     expect(chaine.troncons[1].blindage).toBe(p.troncons[0].blindage);
     expect(chaine.troncons[2].blindage).toBe(p.troncons[0].blindage);
+  });
+
+  it('changer l’ordre des réseaux dans la fouille', () => {
+    const p = projetExemple();
+    const t = changerEcart(p.troncons[0], tuyauxGaucheDroite(p.troncons[0].tuyaux)[1].id, 0.5);
+    const [eu, ep] = tuyauxGaucheDroite(t.tuyaux);
+    const d = deplacerTuyau(t, ep.id, -1);
+    const [a, b] = tuyauxGaucheDroite(d.tuyaux);
+    expect([a.reseau, b.reseau]).toEqual([ep.reseau, eu.reseau]);
+    // l'écart et la largeur sont conservés, le groupe reste centré
+    expect(ecartsTuyaux([a, b])[1]).toBeCloseTo(0.5, 9);
+    expect(d.largeur).toBeCloseTo(t.largeur, 9);
+    expect(deplacerTuyau(d, ep.id, -1)).toBe(d);
   });
 
   it('ajouter puis supprimer un réseau', () => {

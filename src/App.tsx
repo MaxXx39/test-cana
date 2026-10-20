@@ -214,21 +214,11 @@ export default function App() {
         onSelect={setSelection}
       />
       <p className="aide aide-coupe">
-        Coupe à l’échelle : fouille, surface, décapage, largeur, blindage ou talus, épaisseurs des couches et écarts entre tuyaux se
-        saisissent sur la coupe ; l’enrobage se règle par réseau, en haut.
+        Coupe à l’échelle : fouille, surface, décapage, largeur, blindage ou talus, couches de structure (nature et épaisseur), ordre des
+        réseaux et écarts se règlent sur la coupe ; l’enrobage se règle par réseau, en haut.
       </p>
       <div className="reglages">
-        <TronconEditor
-          troncon={troncon}
-          amont={projet.regards[index]}
-          aval={projet.regards[index + 1]}
-          reseaux={projet.reseaux}
-          saisie={projet.saisie}
-          premier={index === 0}
-          onChange={majTroncon}
-          selection={selection}
-          onSelect={setSelection}
-        />
+        <TronconEditor troncon={troncon} premier={index === 0} onChange={majTroncon} />
       </div>
     </div>
   );

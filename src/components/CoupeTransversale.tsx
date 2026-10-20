@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, materiauxEnrobage, nomMateriau, section } from '../calc/engine';
-import { changerEcart, classeMateriau, ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
+import { changerEcart, classeMateriau, deplacerTuyau, ecartsTuyaux, NOMS_COUCHES, nouvelleCouche, repartirTuyaux, tuyauxGaucheDroite } from '../calc/projet';
 import type { ModeSaisie, Regard, Reseau, Troncon } from '../calc/types';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
@@ -53,13 +53,15 @@ function gabarit(largeur: number): Gabarit {
   const compact = vbw < 700;
   return compact
     ? { vbw, compact, jauge: 70, cote: 40, etiq: 0, hauteurUtile: 340 }
-    : { vbw, compact, jauge: 150, cote: 60, etiq: 230, hauteurUtile: 420 };
+    : { vbw, compact, jauge: 150, cote: 60, etiq: 300, hauteurUtile: 420 };
 }
 
 const PAD = 8;
 const TOP = 70;
 const BAS = 96;
 const PAS_ETIQUETTE = 26;
+/** Choix de la nature d'une couche, sur l'étiquette */
+const NATURE_L = 200;
 /** Champs de saisie posés sur le dessin */
 const CHAMP_L = 64;
 const CHAMP_H = 22;
@@ -97,6 +99,8 @@ interface Etiquette {
   epaisseur?: { valeur: number; onChange?: (v: number) => void };
   /** Valeur affichée à la place d'une épaisseur (ex. aire d'enrobage) */
   info?: string;
+  /** Rang de la couche de structure : sa nature se choisit sur l'étiquette */
+  couche?: number;
 }
 
 export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, verrouille = false, mode, onChange, selection, onSelect }: Props) {
@@ -198,13 +202,14 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
   const etiquettes: Etiquette[] = [];
   const zVers = (z: number) => ({ y: Yz(z), ancreX: X(hw(z)), ancreY: Yz(z) });
   // Le décapage n'est pas listé avec la structure : son épaisseur se saisit au-dessus de la coupe
+  // Toutes les couches sont listées, même écrêtées, pour rester modifiables
   sec.bornesCouches.forEach(([z1, z2], i) => {
-    if (z2 <= z1) return;
     etiquettes.push({
       ...zVers((z1 + z2) / 2),
       texte: t.couches[i].nom,
       classe: `et-couche-${i % 6}`,
       epaisseur: { valeur: t.couches[i].epaisseur, onChange: verrouille ? undefined : (v) => majCouche(i, v) },
+      couche: i,
     });
   });
   const zBasStructure = sec.bornesCouches.length ? Math.max(...sec.bornesCouches.map((b) => b[1])) : 0;
@@ -369,6 +374,34 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
       />
     );
 
+  /** Nature d'une couche de structure (liste, ou libellé libre avec « Autre… ») et suppression */
+  const natureCouche = (i: number) => {
+    const c = t.couches[i];
+    const connue = NOMS_COUCHES.includes(c.nom);
+    const nommer = (nom: string) => onChange({ ...t, couches: t.couches.map((x, j) => (j === i ? { ...x, nom } : x)) });
+    return (
+      <span className="nature-coupe">
+        <select value={connue ? c.nom : ''} onChange={(e) => nommer(e.target.value)} aria-label={`Nature de la couche ${i + 1}`}>
+          {NOMS_COUCHES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+          <option value="">Autre…</option>
+        </select>
+        {!connue && <input value={c.nom} placeholder="Nature" onChange={(e) => nommer(e.target.value)} aria-label={`Autre nature de la couche ${i + 1}`} />}
+        <button
+          type="button"
+          title="Supprimer cette couche"
+          aria-label={`Supprimer la couche ${c.nom}`}
+          onClick={() => onChange({ ...t, couches: t.couches.filter((_, j) => j !== i) })}
+        >
+          ×
+        </button>
+      </span>
+    );
+  };
+
   /** Largeur utile en fond, grisée en largeur automatique */
   const champLargeur = (
     <NumberField
@@ -516,7 +549,52 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           Largeur auto
         </label>
         {gab.compact && !verrouille && champLargeur}
+        {!verrouille && (
+          <button
+            type="button"
+            className="btn btn-ajout btn-petit"
+            onClick={() => onChange({ ...t, couches: [...t.couches, nouvelleCouche('Grave 0/31.5', 0.2)] })}
+            title="Ajouter une couche de structure sous les autres"
+          >
+            + Couche
+          </button>
+        )}
       </div>
+      {tries.length > 1 && (
+        <div className="coupe-type coupe-ordre" role="group" aria-label="Ordre des réseaux dans la fouille">
+          <span className="coupe-type-titre">Ordre dans la fouille (gauche → droite)</span>
+          {tries.map((x, k) => {
+            const r = reseau(x.reseau);
+            return (
+              <span key={x.id} className="ordre-reseau" style={{ borderColor: r?.couleur, color: r?.couleur }}>
+                <button type="button" disabled={k === 0} onClick={() => onChange(deplacerTuyau(t, x.id, -1))} aria-label={`Décaler ${r?.nom} vers la gauche`}>
+                  ◀
+                </button>
+                {r?.nom}
+                <button
+                  type="button"
+                  disabled={k === tries.length - 1}
+                  onClick={() => onChange(deplacerTuyau(t, x.id, 1))}
+                  aria-label={`Décaler ${r?.nom} vers la droite`}
+                >
+                  ▶
+                </button>
+              </span>
+            );
+          })}
+          <button
+            type="button"
+            className="btn btn-leger btn-petit"
+            onClick={() => {
+              const r = repartirTuyaux(tries);
+              onChange({ ...t, tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
+            }}
+            title="Écarts ramenés à des enrobages jointifs, tuyaux centrés"
+          >
+            Enrobages jointifs
+          </button>
+        </div>
+      )}
       <svg className="coupe" viewBox={`0 0 ${VBW} ${vbh}`} role="group" aria-label="Coupe transversale de la tranchée">
         <defs>
           <clipPath id={`${idBase}-fouille`}>
@@ -773,9 +851,15 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
                   {e.epaisseur ? `${fmt(e.epaisseur.valeur * 100, 1)} cm` : e.info}
                 </text>
               )}
-              <text x={m.xEtiquettes + 22 + CHAMP_L} y={e.y + 4} className="etiquette-texte">
-                {e.texte}
-              </text>
+              {e.couche !== undefined && !verrouille ? (
+                <foreignObject x={m.xEtiquettes + 20 + CHAMP_L} y={e.y - CHAMP_H / 2} width={NATURE_L} height={CHAMP_H} className="champ-coupe">
+                  {natureCouche(e.couche)}
+                </foreignObject>
+              ) : (
+                <text x={m.xEtiquettes + 22 + CHAMP_L} y={e.y + 4} className="etiquette-texte">
+                  {e.texte}
+                </text>
+              )}
             </g>
           ))}
 
@@ -854,7 +938,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
               ) : (
                 <span className="legende-valeur">{e.epaisseur ? `${fmt(e.epaisseur.valeur * 100, 1)} cm` : e.info}</span>
               )}
-              {e.texte}
+              {e.couche !== undefined && !verrouille ? natureCouche(e.couche) : e.texte}
             </li>
           ))}
         </ul>

@@ -245,6 +245,34 @@ export function changerEcart(t: Troncon, id: string, ecart: number): Troncon {
   return recentrer({ ...t, tuyaux: replacer(tries, ecarts, tries[0].position - tries[0].diametre / 2) }, t.largeurAuto);
 }
 
+/**
+ * Déplace un tuyau d'un rang vers la gauche (-1) ou la droite (+1) dans la fouille. Les
+ * écarts restent attachés à leur place (1er écart, 2e écart…), les tuyaux sont recentrés.
+ */
+export function deplacerTuyau(t: Troncon, id: string, sens: -1 | 1): Troncon {
+  const tries = tuyauxGaucheDroite(t.tuyaux);
+  const k = tries.findIndex((x) => x.id === id);
+  const j = k + sens;
+  if (k < 0 || j < 0 || j >= tries.length) return t;
+  const ecarts = ecartsTuyaux(tries);
+  const x0 = tries[0].position - tries[0].diametre / 2;
+  [tries[k], tries[j]] = [tries[j], tries[k]];
+  return recentrer({ ...t, tuyaux: replacer(tries, ecarts, x0) }, t.largeurAuto);
+}
+
+/** Natures de couches de structure proposées ; « Autre » permet un libellé libre */
+export const NOMS_COUCHES = [
+  'Enrobé BB 0/10',
+  'Béton bitumineux',
+  'Grave-bitume',
+  'Grave 0/31.5',
+  'Grave non traitée 0/20',
+  'Grave ciment',
+  'Sable',
+  'Terre végétale',
+  'Béton',
+];
+
 /** Retire les tuyaux du réseau du tronçon ; les autres gardent leurs écarts */
 export function retirerReseauTroncon(t: Troncon, reseau: string): Troncon {
   const reste = t.tuyaux.filter((x) => x.reseau !== reseau);

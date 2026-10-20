@@ -30,9 +30,10 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa coupe s’ouvre à sa place, entre ses
    deux regards (regards amont et aval compris). Au-dessus de la coupe : fouille en U ou
    en V, surface terre ou enrobé, décapage et son épaisseur, recoupe d’enrobé et sa largeur
-   par côté, largeur auto (par défaut ; la largeur est alors grisée). Sur la coupe : largeur, blindage
-   (U) ou pente du talus (V), épaisseurs de couches, écarts. Sous la coupe : écarts entre
-   tuyaux, couches de structure et matériaux extraits. Les volumes du tronçon sont dans
+   par côté, largeur auto (par défaut ; la largeur est alors grisée). Également au-dessus : « + Couche »,
+   ordre des réseaux dans la fouille (◀ ▶) et « Enrobages jointifs ». Sur la coupe :
+   largeur, blindage (U) ou pente du talus (V), nature et épaisseur de chaque couche,
+   écarts. Sous la coupe : matériaux extraits. Les volumes du tronçon sont dans
    les résultats, avec « Dupliquer vers… » pour recopier sa
    tranchée (et au choix ses tuyaux) vers d’autres tronçons. La case « Même tranchée que
    le tronçon précédent » lie un tronçon au précédent : sa tranchée type (largeur,
