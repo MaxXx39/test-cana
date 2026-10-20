@@ -581,8 +581,46 @@ h3 {
   white-space: nowrap;
 }
 
-.regard-fe-inutile {
-  opacity: 0.45;
+.non-pose {
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.reseau-usage-vide {
+  font-style: italic;
+  color: var(--alerte);
+}
+
+.reseaux-troncon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.puce-choix {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1.5px dashed;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  background: var(--panneau);
+  cursor: pointer;
+}
+
+.puce-choix:hover {
+  background: var(--accent-doux);
+}
+
+.puce-pose {
+  border-style: solid;
+  color: #fff;
+}
+
+.puce-pose:hover {
+  filter: brightness(1.08);
 }
 
 .regard-fe .nf input,

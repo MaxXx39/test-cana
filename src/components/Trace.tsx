@@ -53,9 +53,18 @@ export function Trace({ projet, resultats, actif, onSelect, onRegard, onLongueur
               aria-label="Nom du réseau"
               list="noms-reseaux"
             />
-            <span className="reseau-usage">
-              {troncons.filter((t) => t.tuyaux.some((p) => p.reseau === r.id)).length} / {troncons.length} tronçons
-            </span>
+            {(() => {
+              const n = troncons.filter((t) => t.tuyaux.some((p) => p.reseau === r.id)).length;
+              return n ? (
+                <span className="reseau-usage">
+                  {n} / {troncons.length} tronçons
+                </span>
+              ) : (
+                <span className="reseau-usage reseau-usage-vide" title="Posez-le dans un tronçon : fiche du tronçon, « Réseaux dans ce tronçon »">
+                  pas encore posé
+                </span>
+              );
+            })()}
             <button
               type="button"
               className="btn-icone"
@@ -102,9 +111,17 @@ export function Trace({ projet, resultats, actif, onSelect, onRegard, onLongueur
                 const fe = r.fe[x.id];
                 const prof = r.tn - fe;
                 return (
-                  <div key={x.id} className={`regard-fe ${utilise(x.id, i - 1, i) ? '' : 'regard-fe-inutile'}`}>
+                  <div key={x.id} className="regard-fe">
                     <PastilleReseau couleur={x.couleur} />
-                    <span className="regard-fe-nom">FE {x.nom}</span>
+                    <span className="regard-fe-nom">
+                      FE {x.nom}
+                      {!utilise(x.id, i - 1, i) && (
+                        <span className="non-pose" title="Aucun tuyau de ce réseau dans les tronçons de part et d’autre de ce regard">
+                          {' '}
+                          · non posé
+                        </span>
+                      )}
+                    </span>
                     <NumberField
                       value={fe}
                       onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })}

@@ -78,8 +78,8 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
   };
 
   /** Ajoute un tuyau, de préférence sur un réseau pas encore posé dans ce tronçon */
-  const ajouterTuyau = () => {
-    const libre = reseaux.find((r) => !t.tuyaux.some((p) => p.reseau === r.id)) ?? reseaux[0];
+  const ajouterTuyau = (reseau?: string) => {
+    const libre = reseaux.find((r) => r.id === reseau) ?? reseaux.find((r) => !t.tuyaux.some((p) => p.reseau === r.id)) ?? reseaux[0];
     const modele = t.tuyaux[t.tuyaux.length - 1];
     const p = nouveauTuyau(libre.id, modele?.diametre ?? 0.315);
     if (modele) {
@@ -169,10 +169,39 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
                 Répartir côte à côte
               </button>
             )}
-            <button type="button" className="btn btn-ajout btn-petit" onClick={ajouterTuyau}>
+            <button type="button" className="btn btn-ajout btn-petit" onClick={() => ajouterTuyau()}>
               + Tuyau
             </button>
           </div>
+        </div>
+        <div className="reseaux-troncon" role="group" aria-label="Réseaux posés dans ce tronçon">
+          <span className="champ-label">Réseaux dans ce tronçon :</span>
+          {reseaux.map((r) => {
+            const premier = t.tuyaux.find((p) => p.reseau === r.id);
+            return premier ? (
+              <button
+                key={r.id}
+                type="button"
+                className="puce-choix puce-pose"
+                style={{ background: r.couleur, borderColor: r.couleur }}
+                onClick={() => onSelect(premier.id)}
+                title={`Sélectionner le tuyau ${r.nom}`}
+              >
+                ✓ {r.nom}
+              </button>
+            ) : (
+              <button
+                key={r.id}
+                type="button"
+                className="puce-choix"
+                style={{ borderColor: r.couleur, color: r.couleur }}
+                onClick={() => ajouterTuyau(r.id)}
+                title={`Poser un tuyau ${r.nom} dans ce tronçon`}
+              >
+                + {r.nom}
+              </button>
+            );
+          })}
         </div>
         {t.tuyaux.length === 0 && <p className="aide">Aucun tuyau : la fouille est entièrement remblayée.</p>}
         <div className="liste-tuyaux">
