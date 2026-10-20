@@ -352,6 +352,33 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
     }
   }
 
+  /** Largeur ajoutée de chaque côté (U, blindage) ou pente du talus (V) */
+  const champTypeFouille =
+    t.type === 'U' ? (
+      <NumberField
+        value={t.blindage}
+        onChange={(v) => onChange({ ...t, blindage: Math.max(0, v) })}
+        echelle={100}
+        decimales={1}
+        unite="cm"
+        min={0}
+        pas={1}
+        className="nf-coupe nf-type"
+        title="Largeur ajoutée de chaque côté pour le blindage (cm)"
+      />
+    ) : (
+      <NumberField
+        value={t.fruit}
+        onChange={(v) => onChange({ ...t, fruit: Math.max(0, v) })}
+        decimales={2}
+        unite="H/V"
+        min={0}
+        pas={0.05}
+        className="nf-coupe nf-type"
+        title="Pente du talus : élargissement horizontal par mètre de profondeur, de chaque côté"
+      />
+    );
+
   /** Valeur en lecture seule posée sur le dessin (pastille) */
   const VAL_L = 44;
   const valeur = (cle: string, x: number, y: number, v: number, titre: string): ReactNode => (
@@ -391,6 +418,26 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
 
   return (
     <div ref={boiteRef} className="coupe-boite">
+      <div className="coupe-type" role="group" aria-label="Type de fouille">
+        <span className="coupe-type-titre">Fouille</span>
+        <div className="segment segment-petit" role="radiogroup" aria-label="Fouille en U ou en V">
+          {(['U', 'V'] as const).map((ty) => (
+            <button
+              key={ty}
+              type="button"
+              role="radio"
+              aria-checked={t.type === ty}
+              className={t.type === ty ? 'actif' : ''}
+              disabled={verrouille}
+              onClick={() => onChange({ ...t, type: ty })}
+            >
+              {ty === 'U' ? 'En U · blindée' : 'En V · talutée'}
+            </button>
+          ))}
+        </div>
+        {/* En mode compact, la largeur ajoutée ou la pente se saisit ici plutôt que sur le dessin */}
+        {gab.compact && !verrouille && champTypeFouille}
+      </div>
       <svg className="coupe" viewBox={`0 0 ${VBW} ${vbh}`} role="group" aria-label="Coupe transversale de la tranchée">
         <defs>
           <clipPath id={`${idBase}-fouille`}>
@@ -517,6 +564,24 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           );
         })}
 
+        {/* Largeur ajoutée de chaque côté (blindage, U) ou pente du talus (V), saisie sur la coupe */}
+        {!gab.compact && (
+          <g className="saisie-type">
+            <text x={X(Wt / 2) + 10} y={Yz(0) - 34} className="cote-texte">
+              {t.type === 'U' ? 'blindage / côté' : 'talus H/V'}
+            </text>
+            {verrouille ? (
+              <text x={X(Wt / 2) + 10} y={Yz(0) - 10} className="etiquette-valeur">
+                {t.type === 'U' ? `${fmt(t.blindage * 100, 1)} cm` : fmt(t.fruit, 2)}
+              </text>
+            ) : (
+              <foreignObject x={X(Wt / 2) + 8} y={Yz(0) - 30} width={CHAMP_L + 8} height={CHAMP_H} className="champ-coupe">
+                {champTypeFouille}
+              </foreignObject>
+            )}
+          </g>
+        )}
+
         {/* Cotes */}
         <g className="cote">
           <line x1={X(-Wt / 2) - 36} x2={X(-Wt / 2) - 36} y1={Yz(0)} y2={Yz(H)} />
@@ -577,7 +642,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
               <line x1={X(-Wt / 2)} x2={X(-Wt / 2)} y1={Yz(0) - 22} y2={Yz(0) - 4} />
               <line x1={X(Wt / 2)} x2={X(Wt / 2)} y1={Yz(0) - 22} y2={Yz(0) - 4} />
               <text x={X(0)} y={Yz(0) - 22} textAnchor="middle" className="cote-texte">
-                {fmt(Wt, 2)} m en tête · fruit {fmt(f, 2)}
+                {fmt(Wt, 2)} m en tête
               </text>
             </>
           )}

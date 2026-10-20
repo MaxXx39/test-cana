@@ -214,10 +214,11 @@ export default function App() {
         onSelect={setSelection}
       />
       <p className="aide aide-coupe">
-        Coupe à l’échelle. Saisissez sur la coupe les épaisseurs de couches et de décapage et l’écart entre tuyaux ; l’enrobage se règle par
-        réseau, en haut.
+        Coupe à l’échelle : type de fouille, blindage ou talus, épaisseurs des couches et écarts entre tuyaux se saisissent sur la coupe ;
+        l’enrobage se règle par réseau, en haut.
       </p>
-      <div className="coupe-bas">
+      <details className="reglages">
+        <summary>Autres réglages du tronçon (largeur, surface, décapage, structure, matériaux)</summary>
         <TronconEditor
           troncon={troncon}
           amont={projet.regards[index]}
@@ -229,11 +230,7 @@ export default function App() {
           selection={selection}
           onSelect={setSelection}
         />
-        <div className="colonne-detail">
-          <h3>Volumes du tronçon</h3>
-          <DetailTroncon r={resultats.troncons[index]} />
-        </div>
-      </div>
+      </details>
     </div>
   );
 
@@ -378,6 +375,12 @@ export default function App() {
           <h2>Détail tronçon par tronçon</h2>
           <p className="aide">Volumes en place en m³ ; réemploi et évacuation incluent le foisonnement s’il est coché.</p>
           <TableauTroncons resultats={resultats.troncons} global={resultats.global} actif={index} onSelect={allerAuTroncon} />
+          <h2>
+            Tronçon {index + 1} : {projet.regards[index].nom} → {projet.regards[index + 1].nom}
+          </h2>
+          <div className="detail-troncon-resultats">
+            <DetailTroncon r={resultats.troncons[index]} />
+          </div>
           <h2>Total global</h2>
           <TotalGlobal g={resultats.global} />
         </section>

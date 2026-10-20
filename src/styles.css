@@ -1878,3 +1878,47 @@ fieldset.bloc-form:disabled {
 .vue-generale .coupe-bas {
   margin-top: 0.25rem;
 }
+
+/* ---------- Type de fouille sur la coupe ---------- */
+.coupe-type {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.coupe-type-titre {
+  font-size: 0.82rem;
+  color: var(--texte-2);
+}
+
+.coupe-type .nf-coupe {
+  width: 96px;
+  height: 28px;
+}
+
+.nf-coupe.nf-type {
+  border-color: var(--accent);
+  border-width: 1.5px;
+}
+
+.reglages {
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.reglages > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.reglages[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+.detail-troncon-resultats {
+  max-width: 640px;
+}
