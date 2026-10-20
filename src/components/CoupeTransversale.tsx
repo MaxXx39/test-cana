@@ -374,6 +374,18 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
       />
     );
 
+  /** Ajoute une couche de structure, en surface (au-dessus des autres) */
+  const boutonCouche = (
+    <button
+      type="button"
+      className="btn btn-ajout btn-couche"
+      onClick={() => onChange({ ...t, couches: [nouvelleCouche('Grave 0/31.5', 0.2), ...t.couches] })}
+      title="Ajouter une couche de structure au-dessus des autres"
+    >
+      + Couche
+    </button>
+  );
+
   /** Nature d'une couche de structure (liste, ou libellé libre avec « Autre… ») et suppression */
   const natureCouche = (i: number) => {
     const c = t.couches[i];
@@ -491,6 +503,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
             </button>
           ))}
         </div>
+        <span className={`groupe-option groupe-decapage ${t.decapage.actif ? 'groupe-actif' : ''}`}>
         <label className="case">
           <input
             type="checkbox"
@@ -514,8 +527,9 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
             title="Épaisseur de décapage (enrobé ou terre végétale existants)"
           />
         )}
+        </span>
         {t.surface === 'enrobe' && (
-          <>
+          <span className={`groupe-option groupe-recoupe ${t.recoupe.actif ? 'groupe-actif' : ''}`}>
             <label className="case" title="Nouvelle coupe de l’enrobé, plus large, une fois la tranchée refermée">
               <input
                 type="checkbox"
@@ -542,23 +556,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
                 <span className="coupe-type-titre">par côté</span>
               </span>
             )}
-          </>
+          </span>
         )}
         <label className="case" title="Largeur ajustée aux tuyaux (enrobages et écarts), tuyaux centrés">
           <input type="checkbox" checked={t.largeurAuto} disabled={verrouille} onChange={(e) => onChange({ ...t, largeurAuto: e.target.checked })} />
           Largeur auto
         </label>
         {gab.compact && !verrouille && champLargeur}
-        {!verrouille && (
-          <button
-            type="button"
-            className="btn btn-ajout btn-petit"
-            onClick={() => onChange({ ...t, couches: [...t.couches, nouvelleCouche('Grave 0/31.5', 0.2)] })}
-            title="Ajouter une couche de structure sous les autres"
-          >
-            + Couche
-          </button>
-        )}
       </div>
       {tries.length > 1 && (
         <div className="coupe-type coupe-ordre" role="group" aria-label="Ordre des réseaux dans la fouille">
@@ -582,17 +586,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
               </span>
             );
           })}
-          <button
-            type="button"
-            className="btn btn-leger btn-petit"
-            onClick={() => {
-              const r = repartirTuyaux(tries);
-              onChange({ ...t, tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
-            }}
-            title="Écarts ramenés à des enrobages jointifs, tuyaux centrés"
-          >
-            Enrobages jointifs
-          </button>
         </div>
       )}
       <svg className="coupe" viewBox={`0 0 ${VBW} ${vbh}`} role="group" aria-label="Coupe transversale de la tranchée">
@@ -863,6 +856,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
             </g>
           ))}
 
+        {/* Ajout d'une couche, juste au-dessus des couches de structure */}
+        {!gab.compact && !verrouille && (
+          <foreignObject x={m.xEtiquettes} y={Math.max(4, (etiquettes[0]?.y ?? Yz(0)) - CHAMP_H - 8)} width={120} height={CHAMP_H} className="champ-coupe">
+            {boutonCouche}
+          </foreignObject>
+        )}
+
         {/* Échelle */}
         <g className="echelle">
           <rect x={m.xSection0} y={vbh - 22} width={echelle * s} height={4} />
@@ -899,6 +899,17 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           })}
         </ul>
       )}
+      {tries.length > 1 && <div className="jointif"><button
+          type="button"
+          className="btn btn-leger btn-petit"
+          onClick={() => {
+            const r = repartirTuyaux(tries);
+            onChange({ ...t, tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
+          }}
+          title="Écarts ramenés à des enrobages jointifs, tuyaux centrés"
+        >
+          Enrobages jointifs
+        </button></div>}
       {gab.compact && selectionne && (
         <div className="saisie-tuyau" style={{ '--pastille': couleur(selectionne.tuyau.reseau) } as CSSProperties}>
           <strong>
@@ -929,6 +940,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           })()}
         </div>
       )}
+      {gab.compact && !verrouille && <div className="couche-ajout-compact">{boutonCouche}</div>}
       {gab.compact && (
         <ul className="legende">
           {etiquettes.map((e, i) => (

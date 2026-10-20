@@ -2048,3 +2048,50 @@ fieldset.bloc-form:disabled {
   opacity: 0.25;
   cursor: default;
 }
+
+/* ---------- Groupes d'options encadrés (case + valeur) ---------- */
+.groupe-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.35rem 0.15rem 0.5rem;
+  border: 1.5px dashed var(--bord-fort);
+  border-radius: 8px;
+}
+
+.groupe-decapage.groupe-actif {
+  border: 1.5px solid var(--evac);
+  background: color-mix(in srgb, var(--evac) 8%, var(--panneau));
+}
+
+.groupe-recoupe.groupe-actif {
+  border: 1.5px solid var(--poignee);
+  background: color-mix(in srgb, var(--poignee) 8%, var(--panneau));
+}
+
+.groupe-option .nf-coupe {
+  background: var(--panneau);
+}
+
+.btn-couche {
+  width: 100%;
+  height: 100%;
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  background: var(--panneau);
+}
+
+.couche-ajout-compact {
+  margin-top: 0.4rem;
+}
+
+.couche-ajout-compact .btn-couche {
+  width: auto;
+  height: 28px;
+}
+
+.jointif {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.35rem;
+}
