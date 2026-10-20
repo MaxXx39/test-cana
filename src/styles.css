@@ -434,10 +434,10 @@ h3 {
 /* ---------- Mise en page ---------- */
 .mise {
   display: grid;
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    'trace coupe'
-    'res res';
+    'trace'
+    'res';
   gap: 1rem;
   padding: 1rem;
   max-width: 1600px;
@@ -508,7 +508,6 @@ h3 {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'trace'
-      'coupe'
       'res';
     padding: 0.75rem 0;
   }
@@ -1839,4 +1838,43 @@ fieldset.bloc-form:disabled {
 
 .editeur-longueur {
   max-width: 200px;
+}
+
+/* ---------- Tracé en pleine largeur ---------- */
+/* Les lignes de saisie gardent une largeur de formulaire ; la tranchée du tronçon actif
+   occupe toute la largeur entre ses deux regards. */
+.trace > .reseaux,
+.trace > .trace-titre,
+.trace > .aide,
+.trace > .regard-fe-entete,
+.regard-carte,
+.troncon-ligne,
+.troncon-lien,
+.trace > .btn-plein {
+  max-width: 680px;
+}
+
+.reseaux {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  max-width: none !important;
+}
+
+.reseaux > .titre-actions,
+.reseaux > datalist {
+  grid-column: 1 / -1;
+}
+
+.vue-generale {
+  margin: 0.5rem 0 0.3rem;
+  padding: 0.75rem;
+  border-color: var(--accent);
+}
+
+.vue-generale-barre h3 {
+  margin: 0;
+}
+
+.vue-generale .coupe-bas {
+  margin-top: 0.25rem;
 }

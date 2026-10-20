@@ -188,11 +188,18 @@ export default function App() {
   );
 
   /** Vue générale du tronçon actif, affichée dans le tracé sous ce tronçon */
+  /** Tout le tronçon actif, affiché dans le tracé entre ses deux regards */
   const vueGenerale = (
-    <div className="vue-generale">
+    <div className="vue-generale" id={`troncon-${index}`}>
       <div className="vue-generale-barre">
-        {choixMode}
-        <Duplication projet={projet} index={index} onDupliquer={dupliquer} />
+        <h3>
+          Tranchée du tronçon {index + 1} : {projet.regards[index].nom} → {projet.regards[index + 1].nom}
+          <span className="titre-sous"> · {fmt(troncon.longueur, 2)} m</span>
+        </h3>
+        <div className="actions">
+          {choixMode}
+          <Duplication projet={projet} index={index} onDupliquer={dupliquer} />
+        </div>
       </div>
       <CoupeTransversale
         troncon={troncon}
@@ -206,8 +213,36 @@ export default function App() {
         selection={selection}
         onSelect={setSelection}
       />
+      <p className="aide aide-coupe">
+        Coupe à l’échelle. Saisissez sur la coupe les épaisseurs de couches et de décapage et l’écart entre tuyaux ; l’enrobage se règle par
+        réseau, en haut.
+      </p>
+      <div className="coupe-bas">
+        <TronconEditor
+          troncon={troncon}
+          amont={projet.regards[index]}
+          aval={projet.regards[index + 1]}
+          reseaux={projet.reseaux}
+          saisie={projet.saisie}
+          premier={index === 0}
+          onChange={majTroncon}
+          selection={selection}
+          onSelect={setSelection}
+        />
+        <div className="colonne-detail">
+          <h3>Volumes du tronçon</h3>
+          <DetailTroncon r={resultats.troncons[index]} />
+        </div>
+      </div>
     </div>
   );
+
+  /** Sélectionne un tronçon depuis le tableau des résultats et fait défiler jusqu'à lui */
+  const allerAuTroncon = (i: number) => {
+    setActif(i);
+    setSelection(null);
+    requestAnimationFrame(() => document.getElementById(`troncon-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   return (
     <div className="app">
@@ -339,56 +374,10 @@ export default function App() {
           />
         </aside>
 
-        <section className="panneau panneau-coupe">
-          <div className="titre-actions">
-            <h2>
-              Tronçon {index + 1} : {projet.regards[index].nom} → {projet.regards[index + 1].nom}
-              <span className="titre-sous"> · {fmt(troncon.longueur, 2)} m</span>
-            </h2>
-            <div className="actions">{choixMode}</div>
-          </div>
-          <CoupeTransversale
-            troncon={troncon}
-            amont={projet.regards[index]}
-            aval={projet.regards[index + 1]}
-            reseaux={projet.reseaux}
-            saisie={projet.saisie}
-            verrouille={index > 0 && troncon.commePrecedent}
-            mode={mode}
-            onChange={majTroncon}
-            selection={selection}
-            onSelect={setSelection}
-          />
-          <p className="aide aide-coupe">
-            Coupe à l’échelle. Saisissez directement sur la coupe les épaisseurs de couches et de décapage, l’écart entre tuyaux et
-            l’enrobage du tuyau sélectionné (cliquez un tuyau pour le choisir).
-          </p>
-          <div className="coupe-bas">
-            <TronconEditor
-              troncon={troncon}
-              amont={projet.regards[index]}
-              aval={projet.regards[index + 1]}
-              reseaux={projet.reseaux}
-              saisie={projet.saisie}
-              premier={index === 0}
-              onChange={majTroncon}
-              selection={selection}
-              onSelect={setSelection}
-            />
-            <div className="colonne-detail">
-              <h3>Volumes du tronçon</h3>
-              <DetailTroncon r={resultats.troncons[index]} />
-              <div className="actions actions-col">
-                <Duplication projet={projet} index={index} onDupliquer={dupliquer} />
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section className="panneau panneau-resultats">
           <h2>Détail tronçon par tronçon</h2>
           <p className="aide">Volumes en place en m³ ; réemploi et évacuation incluent le foisonnement s’il est coché.</p>
-          <TableauTroncons resultats={resultats.troncons} global={resultats.global} actif={index} onSelect={setActif} />
+          <TableauTroncons resultats={resultats.troncons} global={resultats.global} actif={index} onSelect={allerAuTroncon} />
           <h2>Total global</h2>
           <TotalGlobal g={resultats.global} />
         </section>

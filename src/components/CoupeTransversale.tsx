@@ -58,7 +58,7 @@ function gabarit(largeur: number): Gabarit {
 
 const PAD = 8;
 const TOP = 70;
-const BAS = 66;
+const BAS = 84;
 const PAS_ETIQUETTE = 26;
 /** Champs de saisie posés sur le dessin */
 const CHAMP_L = 64;
@@ -561,7 +561,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
                   champ(
                     `ecart-${b.id}`,
                     (x1 + x2) / 2,
-                    y - CHAMP_H / 2 - 3,
+                    // sous la cote, pour ne pas masquer l'enrobage latéral affiché à hauteur d'axe
+                    y + CHAMP_H / 2 + 10,
                     e,
                     (v) => onChange(changerEcart(t, b.id, v)),
                     `Écart nu à nu entre ${reseau(tries[i].reseau)?.nom} et ${reseau(b.reseau)?.nom}`,
@@ -611,7 +612,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
         </g>
 
         {/* Enrobage du tuyau sélectionné, affiché sur la coupe */}
-        {selectionne && !gab.compact && enrobageSurCoupe(selectionne)}
+        {/* seulement s'il y a la place : sinon les valeurs restent lisibles dans Réseaux */}
+        {selectionne && !gab.compact && (selectionne.bloc.x1 - selectionne.bloc.x0) * s >= 2.4 * 44 && enrobageSurCoupe(selectionne)}
       </svg>
       {tuyauxListe.length > 0 && (
         <ul className="liste-reseaux-coupe" aria-label="Tuyaux de la coupe, de gauche à droite">

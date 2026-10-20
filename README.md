@@ -27,8 +27,9 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
    - **TN + FE** : altitude du terrain naturel et fil d’eau de chaque réseau ;
    - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
      volumes ne dépendent que des profondeurs).
-3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa vue générale (coupe complète,
-   regards amont et aval) s’ouvre sous lui, avec « Dupliquer vers… » pour recopier sa
+3. **Tronçon** : cliquer un tronçon dans le Tracé ; tout ce qui le concerne s’ouvre à sa
+   place, entre ses deux regards : coupe complète (regards amont et aval), fiche de la
+   tranchée et volumes du tronçon, avec « Dupliquer vers… » pour recopier sa
    tranchée (et au choix ses tuyaux) vers d’autres tronçons. La case « Même tranchée que
    le tronçon précédent » lie un tronçon au précédent : sa tranchée type (largeur,
    blindage, surface, décapage, structure, matériaux) suit, ses tuyaux restent les siens. Les autres tronçons montrent
