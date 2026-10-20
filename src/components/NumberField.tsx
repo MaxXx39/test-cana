@@ -18,10 +18,11 @@ interface Props {
   id?: string;
   /** Classe ajoutée au champ (ex. teinte de colonne) */
   className?: string;
+  disabled?: boolean;
 }
 
 /** Champ numérique acceptant la virgule, qui ne reformate pas pendant la saisie */
-export function NumberField({ value, onChange, echelle = 1, decimales = 2, unite, min, max, pas, label, title, id, className }: Props) {
+export function NumberField({ value, onChange, echelle = 1, decimales = 2, unite, min, max, pas, label, title, id, className, disabled }: Props) {
   const affiche = value * echelle;
   const [texte, setTexte] = useState(() => fmt(affiche, decimales).replace(/\s/g, ''));
   const focus = useRef(false);
@@ -43,9 +44,10 @@ export function NumberField({ value, onChange, echelle = 1, decimales = 2, unite
   };
 
   const input = (
-    <span className={className ? `nf ${className}` : 'nf'}>
+    <span className={`nf ${className ?? ''} ${disabled ? 'nf-inactif' : ''}`}>
       <input
         id={id}
+        disabled={disabled}
         type="text"
         inputMode="decimal"
         value={texte}

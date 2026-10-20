@@ -250,6 +250,27 @@ describe('structure et décapage', () => {
   });
 });
 
+describe('découpe et recoupe d’enrobé', () => {
+  it('deux longueurs de coupe et bandes de recoupe décapées', () => {
+    const t = tronconNu({ surface: 'enrobe', decapage: { actif: true, epaisseur: 0.08 }, recoupe: { actif: true, largeur: 0.1 } });
+    const r = calculTroncon(projet(t, 2, 2), 0);
+    expect(r.longueurDecoupe).toBeCloseTo(20, 9);
+    expect(r.longueurRecoupe).toBeCloseTo(20, 9);
+    expect(r.surfaceRecoupe).toBeCloseTo(2 * 0.1 * 10, 9);
+    expect(r.decapageRecoupe).toBeCloseTo(2 * 0.1 * 10 * 0.08, 9);
+    // décapage = bande de tranchée (1 m × 8 cm × 10 m) + bandes de recoupe
+    expect(r.decapage).toBeCloseTo(0.8 + 0.16, 9);
+    expect(r.deblai).toBeCloseTo(20 - 0.8, 9);
+    // pas de coupe en terre, pas de recoupe si décochée
+    const terre = calculTroncon(projet({ ...t, surface: 'terre' }, 2, 2), 0);
+    expect([terre.longueurDecoupe, terre.longueurRecoupe, terre.decapageRecoupe]).toEqual([0, 0, 0]);
+    const sans = calculTroncon(projet({ ...t, recoupe: { actif: false, largeur: 0.1 } }, 2, 2), 0);
+    expect([sans.longueurDecoupe, sans.longueurRecoupe]).toEqual([20, 0]);
+    const g = calculProjet(projet(t, 2, 2)).global;
+    expect([g.longueurDecoupe, g.longueurRecoupe]).toEqual([20, 20]);
+  });
+});
+
 describe('réutilisation et foisonnement', () => {
   it('réemploi foisonné et évacuation', () => {
     const t = tronconNu({

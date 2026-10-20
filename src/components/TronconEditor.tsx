@@ -172,20 +172,38 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, premie
           <button
             type="button"
             className="btn btn-ajout"
-            onClick={() => maj({ couches: [...t.couches, nouvelleCouche(`Couche ${t.couches.length + 1}`, 0.2)] })}
+            onClick={() => maj({ couches: [...t.couches, nouvelleCouche('Grave 0/31.5', 0.2)] })}
           >
             + Couche
           </button>
         </div>
-        <datalist id="noms-couches">
-          {NOMS_COUCHES.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
         {t.couches.map((c, i) => (
           <div key={c.id} className="ligne-couche">
             <span className={`pastille couche-${i % 6}`} aria-hidden="true" />
-            <input className="input-nom" list="noms-couches" value={c.nom} onChange={(e) => majCouche(c.id, { nom: e.target.value })} aria-label="Nom de la couche" />
+            <span className="nature-couche">
+              <select
+                className="select-nature"
+                value={NOMS_COUCHES.includes(c.nom) ? c.nom : ''}
+                onChange={(e) => majCouche(c.id, { nom: e.target.value })}
+                aria-label="Nature de la couche"
+              >
+                {NOMS_COUCHES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+                <option value="">Autre…</option>
+              </select>
+              {!NOMS_COUCHES.includes(c.nom) && (
+                <input
+                  className="input-nom"
+                  value={c.nom}
+                  placeholder="Nature de la couche"
+                  onChange={(e) => majCouche(c.id, { nom: e.target.value })}
+                  aria-label="Autre nature de couche"
+                />
+              )}
+            </span>
             <NumberField value={c.epaisseur} onChange={(v) => majCouche(c.id, { epaisseur: v })} echelle={100} decimales={1} unite="cm" min={0} pas={1} />
             <button type="button" className="btn-icone" onClick={() => deplacerCouche(i, -1)} disabled={i === 0} title="Monter" aria-label="Monter la couche">
               ↑

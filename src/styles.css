@@ -1908,3 +1908,64 @@ fieldset.bloc-form:disabled {
 .detail-troncon-resultats {
   max-width: 640px;
 }
+
+/* ---------- Décapage, recoupe, largeur auto ---------- */
+.nf-inactif {
+  opacity: 0.55;
+  background: var(--bg);
+}
+
+.nf-inactif input {
+  cursor: not-allowed;
+}
+
+.nf-coupe.nf-decapage {
+  border-color: var(--evac);
+  border-width: 1.5px;
+}
+
+.nf-coupe.nf-recoupe {
+  border-color: var(--poignee);
+  border-width: 1.5px;
+}
+
+.coupe-type-champ {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.bande-recoupe {
+  fill: var(--poignee);
+  fill-opacity: 0.25;
+  stroke: var(--poignee);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.trait-coupe {
+  stroke: var(--poignee);
+  stroke-width: 2;
+}
+
+.trait-decoupe {
+  stroke: var(--evac);
+}
+
+.nature-couche {
+  display: flex;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nature-couche .select-nature {
+  flex: 1 1 50%;
+  min-width: 0;
+  border-color: var(--bord-fort);
+  padding: 0.3rem 0.35rem;
+}
+
+.nature-couche .input-nom {
+  flex: 1 1 50%;
+}

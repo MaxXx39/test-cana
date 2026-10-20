@@ -41,6 +41,9 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
       'Évacuation (m³)',
       'Apport remblai (m³)',
       'Emprise (m²)',
+      'Découpe enrobé (ml)',
+      'Recoupe enrobé (ml)',
+      'Bandes de recoupe (m²)',
       'Blindage (m²)',
       'Alertes',
     ]
@@ -72,6 +75,9 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
         nb(r.evacuation),
         nb(r.apport),
         nb(r.surfaceTete),
+        nb(r.longueurDecoupe),
+        nb(r.longueurRecoupe),
+        nb(r.surfaceRecoupe),
         nb(r.surfaceBlindage),
         txt(r.alertes.join(' | ')),
       ].join(separateur),
@@ -93,6 +99,9 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
     ['Remblai réemployé', g.reemploi, 'm³'],
     ['Évacuation', g.evacuation, 'm³'],
     ['Emprise en tête', g.surfaceTete, 'm²'],
+    ['Découpe d’enrobé avant ouverture', g.longueurDecoupe, 'ml'],
+    ['Recoupe d’enrobé après remblai', g.longueurRecoupe, 'ml'],
+    ['Bandes de recoupe', g.surfaceRecoupe, 'm²'],
     ['Blindage', g.surfaceBlindage, 'm²'],
   ];
   for (const [lib, v, u] of total) lignes.push([txt(lib), nb(v), u].join(separateur));

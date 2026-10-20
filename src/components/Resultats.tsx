@@ -62,7 +62,10 @@ export function DetailTroncon({ r }: { r: ResultatTroncon }) {
           </tr>
           {r.decapage > 0 && (
             <tr>
-              <td>Décapage {r.surface === 'enrobe' ? 'enrobé' : 'terre'}</td>
+              <td>
+                Décapage {r.surface === 'enrobe' ? 'enrobé' : 'terre'}
+                {r.decapageRecoupe > 0 && <div className="aide">dont recoupe {m3(r.decapageRecoupe)}</div>}
+              </td>
               <td className="num">{m3(r.decapage)}</td>
               <td>{destination(r.extraitDecapage, true)}</td>
             </tr>
@@ -105,6 +108,23 @@ export function DetailTroncon({ r }: { r: ResultatTroncon }) {
             <td className="num">{m3(r.remblai)}</td>
             <td className="aide">dont apport : {m3(r.apport)}</td>
           </tr>
+          {(r.longueurDecoupe > 0 || r.longueurRecoupe > 0) && (
+            <>
+              <tr className="groupe">
+                <th colSpan={3}>Coupes d’enrobé</th>
+              </tr>
+              <tr>
+                <td>Découpe avant ouverture</td>
+                <td className="num">{fmt(r.longueurDecoupe, 2)} ml</td>
+                <td className="aide">2 bords</td>
+              </tr>
+              <tr>
+                <td>Recoupe après remblai</td>
+                <td className="num">{fmt(r.longueurRecoupe, 2)} ml</td>
+                <td className="aide">{r.surfaceRecoupe > 0 ? `bandes : ${fmt(r.surfaceRecoupe, 2)} m²` : 'sans recoupe'}</td>
+              </tr>
+            </>
+          )}
           <tr className="groupe">
             <th colSpan={3}>Surfaces</th>
           </tr>
@@ -266,6 +286,9 @@ export function TotalGlobal({ g }: { g: ResultatGlobal }) {
           </tr>
           {ligne('Linéaire de tranchée', g.longueur, 'm')}
           {ligne('Emprise en tête', g.surfaceTete, 'm²')}
+          {g.longueurDecoupe > 0 && ligne('Découpe d’enrobé avant ouverture', g.longueurDecoupe, 'ml')}
+          {g.longueurRecoupe > 0 && ligne('Recoupe d’enrobé après remblai', g.longueurRecoupe, 'ml')}
+          {g.surfaceRecoupe > 0 && ligne('Bandes de recoupe', g.surfaceRecoupe, 'm²')}
           {g.surfaceBlindage > 0 && ligne('Blindage', g.surfaceBlindage, 'm²')}
           {ligne('Volume occupé par les tuyaux', g.tuyaux)}
         </tbody>

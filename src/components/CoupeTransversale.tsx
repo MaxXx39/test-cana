@@ -171,6 +171,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
     [X(-W / 2 - f * H), Yy(H)],
   ]);
   const epBlindage = Wf - W > 1e-9 ? (Wf - W) / 2 : 0;
+  const recoupe = t.surface === 'enrobe' && t.recoupe.actif && t.recoupe.largeur > 0;
   // Écarts nu à nu entre tuyaux voisins (de gauche à droite)
   const tries = tuyauxGaucheDroite(t.tuyaux);
   const ecarts = ecartsTuyaux(tries);
@@ -196,18 +197,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
   // ----- Étiquettes -----
   const etiquettes: Etiquette[] = [];
   const zVers = (z: number) => ({ y: Yz(z), ancreX: X(hw(z)), ancreY: Yz(z) });
-  if (t.decapage.actif) {
-    const e = Math.min(t.decapage.epaisseur, H);
-    etiquettes.push({
-      ...zVers(e / 2),
-      texte: `Décapage ${t.surface === 'enrobe' ? 'enrobé' : 'terre'}`,
-      classe: 'et-decapage',
-      epaisseur: {
-        valeur: t.decapage.epaisseur,
-        onChange: verrouille ? undefined : (v) => onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0, v) } }),
-      },
-    });
-  }
+  // Le décapage n'est pas listé avec la structure : son épaisseur se saisit au-dessus de la coupe
   sec.bornesCouches.forEach(([z1, z2], i) => {
     if (z2 <= z1) return;
     etiquettes.push({
@@ -379,15 +369,16 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
       />
     );
 
-  /** Largeur utile en fond ; une saisie passe la largeur en fixe */
+  /** Largeur utile en fond, grisée en largeur automatique */
   const champLargeur = (
     <NumberField
       value={t.largeur}
-      onChange={(v) => onChange({ ...t, largeur: Math.max(0.1, v), largeurAuto: false })}
+      onChange={(v) => onChange({ ...t, largeur: Math.max(0.1, v) })}
       decimales={2}
       unite="m"
       min={0.1}
       pas={0.05}
+      disabled={t.largeurAuto || verrouille}
       className="nf-coupe nf-type"
       title={t.type === 'U' ? 'Largeur utile en fond, entre blindages (m)' : 'Largeur en fond (m)'}
     />
@@ -476,6 +467,50 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           />
           Décapage
         </label>
+        {t.decapage.actif && (
+          <NumberField
+            value={t.decapage.epaisseur}
+            onChange={(v) => onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0, v) } })}
+            echelle={100}
+            decimales={1}
+            unite="cm"
+            min={0}
+            pas={1}
+            disabled={verrouille}
+            className="nf-coupe nf-decapage"
+            title="Épaisseur de décapage (enrobé ou terre végétale existants)"
+          />
+        )}
+        {t.surface === 'enrobe' && (
+          <>
+            <label className="case" title="Nouvelle coupe de l’enrobé, plus large, une fois la tranchée refermée">
+              <input
+                type="checkbox"
+                checked={t.recoupe.actif}
+                disabled={verrouille}
+                onChange={(e) => onChange({ ...t, recoupe: { ...t.recoupe, actif: e.target.checked } })}
+              />
+              Recoupe d’enrobé
+            </label>
+            {t.recoupe.actif && (
+              <span className="coupe-type-champ">
+                <NumberField
+                  value={t.recoupe.largeur}
+                  onChange={(v) => onChange({ ...t, recoupe: { ...t.recoupe, largeur: Math.max(0, v) } })}
+                  echelle={100}
+                  decimales={1}
+                  unite="cm"
+                  min={0}
+                  pas={1}
+                  disabled={verrouille}
+                  className="nf-coupe nf-recoupe"
+                  title="Largeur de recoupe au-delà de chaque bord de la tranchée"
+                />
+                <span className="coupe-type-titre">par côté</span>
+              </span>
+            )}
+          </>
+        )}
         <label className="case" title="Largeur ajustée aux tuyaux (enrobages et écarts), tuyaux centrés">
           <input type="checkbox" checked={t.largeurAuto} disabled={verrouille} onChange={(e) => onChange({ ...t, largeurAuto: e.target.checked })} />
           Largeur auto
@@ -577,6 +612,25 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
             className="ligne-decapage"
           />
         )}
+        {/* Recoupe d'enrobé : bandes de part et d'autre de la tranchée, coupées à leur bord extérieur */}
+        {recoupe &&
+          [-1, 1].map((c) => {
+            const x0 = c < 0 ? X(-Wt / 2 - t.recoupe.largeur) : X(Wt / 2);
+            const xc = c < 0 ? X(-Wt / 2 - t.recoupe.largeur) : X(Wt / 2 + t.recoupe.largeur);
+            return (
+              <g key={c} className="recoupe">
+                <title>{`Recoupe d’enrobé · ${cm(t.recoupe.largeur)} cm`}</title>
+                <rect x={x0} y={Yz(0)} width={t.recoupe.largeur * s} height={Math.max(2, Math.min(t.decapage.epaisseur, H) * s)} className="bande-recoupe" />
+                <line x1={xc} x2={xc} y1={Yz(0) - 7} y2={Yz(Math.min(t.decapage.epaisseur, H)) + 3} className="trait-coupe" />
+              </g>
+            );
+          })}
+        {t.surface === 'enrobe' &&
+          [-1, 1].map((c) => (
+            <line key={`dec-${c}`} x1={X((c * Wt) / 2)} x2={X((c * Wt) / 2)} y1={Yz(0) - 5} y2={Yz(0) + 3} className="trait-coupe trait-decoupe">
+              <title>Découpe de l’enrobé</title>
+            </line>
+          ))}
         <line x1={xG0} x2={xG1} y1={Yz(0)} y2={Yz(0)} className="sol-ligne" />
 
         {/* Tuyaux, à la couleur de leur réseau */}
@@ -659,6 +713,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
               <text x={X(0) + 50} y={Yy(0) + 55} className="cote-texte">
                 {t.largeurAuto ? 'auto' : ''}
                 {epBlindage > 0 ? `${t.largeurAuto ? ' · ' : ''}fouille ${fmt(Wf, 2)} m` : ''}
+                {recoupe ? ` · recoupe ${fmt(Wt + 2 * t.recoupe.largeur, 2)} m` : ''}
               </text>
             </>
           )}

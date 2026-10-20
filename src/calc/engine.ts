@@ -349,6 +349,14 @@ export interface ResultatTroncon {
   couches: { nom: string; volume: number }[];
   remblai: number;
   surfaceTete: number;
+  /** Découpe de l'enrobé avant ouverture : les deux bords de la tranchée (ml) */
+  longueurDecoupe: number;
+  /** Recoupe de l'enrobé après remblaiement : les deux bords élargis (ml) */
+  longueurRecoupe: number;
+  /** Bandes de recoupe de part et d'autre de la tranchée (m²) */
+  surfaceRecoupe: number;
+  /** Enrobé enlevé dans les bandes de recoupe, compris dans le décapage (m³) */
+  decapageRecoupe: number;
   surfaceBlindage: number;
   extraitDeblai: VolumeExtrait;
   extraitDecapage: VolumeExtrait;
@@ -441,7 +449,14 @@ export function calculTroncon(p: Projet, index: number): ResultatTroncon {
   const L = Math.max(0, t.longueur);
   const m = moyennesLongueur(t, ra, rb);
 
-  const decapage = L * m.decapage;
+  // Coupes d'enrobé : découpe des deux bords avant ouverture, puis recoupe éventuelle des
+  // deux bords élargis une fois la tranchée refermée. La bande de recoupe est décapée sur
+  // l'épaisseur du décapage et s'ajoute au volume décapé.
+  const enrobe = t.surface === 'enrobe';
+  const recoupe = enrobe && t.recoupe.actif && t.recoupe.largeur > 0;
+  const surfaceRecoupe = recoupe ? 2 * t.recoupe.largeur * L : 0;
+  const decapageRecoupe = surfaceRecoupe * Math.max(0, t.decapage.epaisseur);
+  const decapage = L * m.decapage + decapageRecoupe;
   const deblai = L * m.deblai;
   const remblai = L * m.remblai;
   const extraitDeblai = extrait(deblai, t.optionsDeblai);
@@ -467,6 +482,10 @@ export function calculTroncon(p: Projet, index: number): ResultatTroncon {
     couches: t.couches.map((c, i) => ({ nom: c.nom, volume: L * m.couches[i] })),
     remblai,
     surfaceTete: L * m.largeurTete,
+    longueurDecoupe: enrobe ? 2 * L : 0,
+    longueurRecoupe: recoupe ? 2 * L : 0,
+    surfaceRecoupe,
+    decapageRecoupe,
     surfaceBlindage: t.type === 'U' ? 2 * L * Math.max(0, m.H) : 0,
     extraitDeblai,
     extraitDecapage,
@@ -494,6 +513,9 @@ export interface ResultatGlobal {
   couches: { nom: string; volume: number }[];
   remblai: number;
   surfaceTete: number;
+  longueurDecoupe: number;
+  longueurRecoupe: number;
+  surfaceRecoupe: number;
   surfaceBlindage: number;
   reemploi: number;
   evacuation: number;
@@ -538,6 +560,9 @@ export function calculGlobal(resultats: ResultatTroncon[]): ResultatGlobal {
     couches,
     remblai: somme((r) => r.remblai),
     surfaceTete: somme((r) => r.surfaceTete),
+    longueurDecoupe: somme((r) => r.longueurDecoupe),
+    longueurRecoupe: somme((r) => r.longueurRecoupe),
+    surfaceRecoupe: somme((r) => r.surfaceRecoupe),
     surfaceBlindage: somme((r) => r.surfaceBlindage),
     reemploi: somme((r) => r.reemploi),
     evacuation: somme((r) => r.evacuation),

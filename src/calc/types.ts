@@ -80,6 +80,11 @@ export interface Troncon {
   fruit: number;
   surface: SurfaceNature;
   decapage: { actif: boolean; epaisseur: number };
+  /**
+   * Recoupe de l'enrobé une fois la tranchée refermée (surface en enrobé) : nouvelle coupe
+   * à `largeur` de chaque bord de la tranchée, sur l'épaisseur du décapage
+   */
+  recoupe: { actif: boolean; largeur: number };
   tuyaux: Tuyau[];
   /** Couches de structure, de la surface vers le bas */
   couches: Couche[];

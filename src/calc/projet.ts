@@ -66,6 +66,7 @@ export function nouveauTroncon(longueur: number, reseau: string): Troncon {
     fruit: 0.5,
     surface: 'enrobe',
     decapage: { actif: true, epaisseur: 0.08 },
+    recoupe: { actif: false, largeur: 0.1 },
     tuyaux: [nouveauTuyau(reseau)],
     couches: [nouvelleCouche('Enrobé BB 0/10', 0.06), nouvelleCouche('Grave-bitume', 0.12), nouvelleCouche('Grave 0/31.5', 0.3)],
     remblaiNom: 'Remblai de tranchée',
@@ -262,6 +263,7 @@ function copierTranchee(modele: Troncon, t: Troncon): Troncon {
     fruit: modele.fruit,
     surface: modele.surface,
     decapage: { ...modele.decapage },
+    recoupe: { ...modele.recoupe },
     couches: modele.couches.map((c) => ({ ...c })),
     remblaiNom: modele.remblaiNom,
     optionsDeblai: { ...modele.optionsDeblai },
@@ -484,13 +486,17 @@ export function normaliserProjet(brut: unknown): Projet {
     commePrecedent: ti > 0 && t?.commePrecedent === true,
     type: t?.type === 'V' ? ('V' as const) : ('U' as const),
     largeur: nombre(t?.largeur, base.largeur),
-    largeurAuto: typeof t?.largeurAuto === 'boolean' ? t.largeurAuto : false,
+    largeurAuto: typeof t?.largeurAuto === 'boolean' ? t.largeurAuto : true,
     blindage: Math.max(0, nombre(t?.blindage, 0)),
     fruit: nombre(t?.fruit, base.fruit),
     surface: t?.surface === 'terre' ? ('terre' as const) : ('enrobe' as const),
     decapage: {
       actif: typeof t?.decapage?.actif === 'boolean' ? t.decapage.actif : base.decapage.actif,
       epaisseur: nombre(t?.decapage?.epaisseur, base.decapage.epaisseur),
+    },
+    recoupe: {
+      actif: t?.recoupe?.actif === true,
+      largeur: Math.max(0, nombre(t?.recoupe?.largeur, base.recoupe.largeur)),
     },
     tuyaux: (Array.isArray(t?.tuyaux) ? (t.tuyaux as Brut[]) : []).map((p) => {
       let reseau = typeof p?.reseau === 'string' && reseaux.some((r) => r.id === p.reseau) ? p.reseau : ref;

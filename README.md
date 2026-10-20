@@ -29,7 +29,8 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
      volumes ne dépendent que des profondeurs).
 3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa coupe s’ouvre à sa place, entre ses
    deux regards (regards amont et aval compris). Au-dessus de la coupe : fouille en U ou
-   en V, surface terre ou enrobé, décapage, largeur auto. Sur la coupe : largeur, blindage
+   en V, surface terre ou enrobé, décapage et son épaisseur, recoupe d’enrobé et sa largeur
+   par côté, largeur auto (par défaut ; la largeur est alors grisée). Sur la coupe : largeur, blindage
    (U) ou pente du talus (V), épaisseurs de couches, écarts. Sous la coupe : écarts entre
    tuyaux, couches de structure et matériaux extraits. Les volumes du tronçon sont dans
    les résultats, avec « Dupliquer vers… » pour recopier sa
@@ -78,6 +79,10 @@ Repère de la coupe : y = 0 au fond de fouille. Toutes les dimensions sont en m�
 - **Remblai** : comble l’espace restant entre l’enrobage et la structure (hauteur variable).
 - **Décapage** : bande de surface d’épaisseur propre, sur la largeur en tête. Le déblai est
   compté hors décapage pour ne pas compter deux fois le même volume.
+- **Coupes d’enrobé** (surface en enrobé) : découpe des deux bords avant ouverture
+  (2 × longueur) et, si la recoupe est cochée, recoupe des deux bords élargis après
+  remblai (2 × longueur). Les bandes de recoupe sont décapées sur l’épaisseur du décapage,
+  volume ajouté au décapage.
 - **Réutilisation / foisonnement** : pour le déblai et le décapage de chaque tronçon,
   « réutilisé en remblai » range le volume en réemploi (sinon en évacuation) et
   « foisonnement » lui applique le coefficient saisi. Le remblai d’apport est le besoin en
