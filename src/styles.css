@@ -551,7 +551,7 @@ h3 {
 
 .regard-tete {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 96px 28px;
+  grid-template-columns: minmax(0, 1fr) auto 108px 28px;
   gap: 0.35rem;
   align-items: center;
 }
@@ -565,9 +565,13 @@ h3 {
   color: var(--texte-2);
 }
 
+.regard-tete-seule {
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+
 .regard-fe {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) 96px 52px;
+  grid-template-columns: 10px minmax(0, 1fr) 108px 52px;
   gap: 0.35rem;
   align-items: center;
   padding-right: 28px;
@@ -581,46 +585,9 @@ h3 {
   white-space: nowrap;
 }
 
-.non-pose {
-  font-style: italic;
-  font-size: 0.75rem;
-}
-
 .reseau-usage-vide {
   font-style: italic;
   color: var(--alerte);
-}
-
-.reseaux-troncon {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin-bottom: 0.6rem;
-}
-
-.puce-choix {
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 700;
-  border: 1.5px dashed;
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  background: var(--panneau);
-  cursor: pointer;
-}
-
-.puce-choix:hover {
-  background: var(--accent-doux);
-}
-
-.puce-pose {
-  border-style: solid;
-  color: #fff;
-}
-
-.puce-pose:hover {
-  filter: brightness(1.08);
 }
 
 .regard-fe .nf input,
@@ -638,25 +605,19 @@ h3 {
   font-weight: 600;
 }
 
-.troncon-reseaux {
-  display: inline-flex;
-  gap: 0.25rem;
-  margin-left: 0.4rem;
-  vertical-align: 1px;
-}
-
-.puce-reseau {
-  font-size: 0.68rem;
-  font-weight: 700;
-  border: 1.5px solid;
-  border-radius: 999px;
-  padding: 0 0.35rem;
-  line-height: 1.35;
-}
-
 .btn-petit {
   padding: 0.2rem 0.55rem;
   font-size: 0.85rem;
+}
+
+.troncon-bloc {
+  margin: 0 0 0 0.75rem;
+  padding: 0.3rem 0.3rem 0.4rem 0.6rem;
+  border-left: 3px solid var(--bord-fort);
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .troncon-ligne {
@@ -664,10 +625,45 @@ h3 {
   grid-template-columns: minmax(0, 1fr) 96px 28px;
   gap: 0.3rem;
   align-items: center;
-  margin: 0 0 0 0.75rem;
-  padding: 0.3rem 0.3rem 0.3rem 0.6rem;
-  border-left: 3px solid var(--bord-fort);
-  border-radius: 0 6px 6px 0;
+}
+
+.troncon-tuyaux {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tuyau-choix {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 28px;
+  gap: 0.3rem;
+  align-items: center;
+  min-height: 30px;
+}
+
+.tuyau-choix .case {
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--texte-2);
+}
+
+.tuyau-choix-pose .case {
+  color: var(--texte);
+  font-weight: 600;
+}
+
+.tuyau-choix-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tuyau-choix-vide {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--texte-2);
+  text-align: right;
+  padding-right: 0.45rem;
 }
 
 .troncon-actif {
@@ -1047,18 +1043,12 @@ polygon.couche {
   align-items: center;
 }
 
-.select-reseau {
-  font: inherit;
+.tuyau-reseau {
   font-weight: 700;
-  border: 1px solid var(--bord-fort);
-  border-radius: 6px;
-  background: var(--panneau);
-  padding: 0.3rem 0.35rem;
-  min-width: 0;
-}
-
-.select-reseau option {
-  color: var(--texte);
+  padding: 0.3rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tuyau-resume {
@@ -1362,7 +1352,6 @@ th {
 .jauge-compacte .jauge-nom {
   font-size: 13px;
 }
-
 
 .legende {
   list-style: none;

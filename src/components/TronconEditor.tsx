@@ -1,5 +1,5 @@
-import type { Couche, OptionsMateriau, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
-import { nouveauTuyau, nouvelleCouche, repartirTuyaux } from '../calc/projet';
+import type { Couche, ModeSaisie, OptionsMateriau, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
+import { nouvelleCouche, repartirTuyaux } from '../calc/projet';
 import { filDEauRegard, profondeur } from '../calc/engine';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
@@ -9,6 +9,7 @@ interface Props {
   amont: Regard;
   aval: Regard;
   reseaux: Reseau[];
+  saisie: ModeSaisie;
   onChange: (t: Troncon) => void;
   selection: string | null;
   onSelect: (id: string | null) => void;
@@ -56,7 +57,7 @@ function OptionsExtrait({ titre, options, onChange }: { titre: string; options: 
 
 const cm = (m: number) => fmt(m * 100, 0);
 
-export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, selection, onSelect }: Props) {
+export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChange, selection, onSelect }: Props) {
   const maj = (partiel: Partial<Troncon>) => onChange({ ...t, ...partiel });
   const majTuyau = (id: string, partiel: Partial<Tuyau>) =>
     maj({ tuyaux: t.tuyaux.map((p) => (p.id === id ? { ...p, ...partiel } : p)) });
@@ -75,19 +76,6 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
   const repartir = (tuyaux: Tuyau[]) => {
     const r = repartirTuyaux(tuyaux);
     maj({ tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) });
-  };
-
-  /** Ajoute un tuyau, de préférence sur un réseau pas encore posé dans ce tronçon */
-  const ajouterTuyau = (reseau?: string) => {
-    const libre = reseaux.find((r) => r.id === reseau) ?? reseaux.find((r) => !t.tuyaux.some((p) => p.reseau === r.id)) ?? reseaux[0];
-    const modele = t.tuyaux[t.tuyaux.length - 1];
-    const p = nouveauTuyau(libre.id, modele?.diametre ?? 0.315);
-    if (modele) {
-      p.paroi = modele.paroi;
-      p.enrobage = { ...modele.enrobage };
-    }
-    repartir([...t.tuyaux, p]);
-    onSelect(p.id);
   };
 
   const enrobageATous = (e: Tuyau['enrobage']) => maj({ tuyaux: t.tuyaux.map((p) => ({ ...p, enrobage: { ...e } })) });
@@ -162,48 +150,14 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
 
       <section className="bloc-form">
         <div className="titre-actions">
-          <h3>Tuyaux et enrobage</h3>
-          <div className="actions">
-            {t.tuyaux.length > 1 && (
-              <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Placer les tuyaux côte à côte, centrés (élargit la tranchée si nécessaire)">
-                Répartir côte à côte
-              </button>
-            )}
-            <button type="button" className="btn btn-ajout btn-petit" onClick={() => ajouterTuyau()}>
-              + Tuyau
+          <h3>Position et enrobage des tuyaux</h3>
+          {t.tuyaux.length > 1 && (
+            <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Placer les tuyaux côte à côte, centrés (élargit la tranchée si nécessaire)">
+              Répartir côte à côte
             </button>
-          </div>
+          )}
         </div>
-        <div className="reseaux-troncon" role="group" aria-label="Réseaux posés dans ce tronçon">
-          <span className="champ-label">Réseaux dans ce tronçon :</span>
-          {reseaux.map((r) => {
-            const premier = t.tuyaux.find((p) => p.reseau === r.id);
-            return premier ? (
-              <button
-                key={r.id}
-                type="button"
-                className="puce-choix puce-pose"
-                style={{ background: r.couleur, borderColor: r.couleur }}
-                onClick={() => onSelect(premier.id)}
-                title={`Sélectionner le tuyau ${r.nom}`}
-              >
-                ✓ {r.nom}
-              </button>
-            ) : (
-              <button
-                key={r.id}
-                type="button"
-                className="puce-choix"
-                style={{ borderColor: r.couleur, color: r.couleur }}
-                onClick={() => ajouterTuyau(r.id)}
-                title={`Poser un tuyau ${r.nom} dans ce tronçon`}
-              >
-                + {r.nom}
-              </button>
-            );
-          })}
-        </div>
-        {t.tuyaux.length === 0 && <p className="aide">Aucun tuyau : la fouille est entièrement remblayée.</p>}
+        {t.tuyaux.length === 0 && <p className="aide">Aucun tuyau : cochez un réseau dans ce tronçon, colonne Tracé. La fouille est entièrement remblayée.</p>}
         <div className="liste-tuyaux">
           {t.tuyaux.map((p) => {
             const res = reseaux.find((r) => r.id === p.reseau);
@@ -219,36 +173,20 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
                 onFocusCapture={() => onSelect(p.id)}
               >
                 <div className="tuyau-ligne">
-                  <select
-                    className="select-reseau"
-                    value={p.reseau}
-                    onChange={(e) => majTuyau(p.id, { reseau: e.target.value })}
-                    aria-label="Réseau"
-                    style={{ color: res?.couleur }}
-                  >
-                    {reseaux.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.nom}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="tuyau-reseau" style={{ color: res?.couleur }}>
+                    {res?.nom}
+                  </span>
                   <NumberField value={p.diametre} onChange={(v) => majTuyau(p.id, { diametre: v })} echelle={1000} decimales={0} unite="mm" min={10} pas={10} title="Diamètre extérieur" />
                   <NumberField value={p.position} onChange={(v) => majTuyau(p.id, { position: v })} unite="m" pas={0.05} title="Position de l’axe du tuyau par rapport à l’axe de la tranchée (négatif = à gauche)" />
-                  <button
-                    type="button"
-                    className="btn-icone"
-                    title="Supprimer ce tuyau"
-                    aria-label={`Supprimer le tuyau ${res?.nom ?? ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      maj({ tuyaux: t.tuyaux.filter((q) => q.id !== p.id) });
-                    }}
-                  >
-                    ×
-                  </button>
+                  <span />
                 </div>
                 <div className="tuyau-resume">
-                  FE {fmt(feA, 2)} → {fmt(feB, 2)} · prof. {fmt(amont.tn - feA, 2)} → {fmt(aval.tn - feB, 2)} m
+                  {saisie === 'altitudes' && (
+                    <>
+                      FE {fmt(feA, 2)} → {fmt(feB, 2)} ·{' '}
+                    </>
+                  )}
+                  prof. {fmt(amont.tn - feA, 2)} → {fmt(aval.tn - feB, 2)} m
                   {!sel && (
                     <>
                       {' '}
@@ -282,7 +220,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, sele
           })}
         </div>
         {t.tuyaux.length > 0 && (
-          <p className="aide">Cliquez un tuyau (ici ou sur la coupe) pour régler son enrobage. Le fil d’eau de chaque réseau se saisit aux regards.</p>
+          <p className="aide">Cliquez un tuyau (ici ou sur la coupe) pour régler son enrobage. Les réseaux posés, leur diamètre et leur profondeur se saisissent dans la colonne Tracé.</p>
         )}
       </section>
 

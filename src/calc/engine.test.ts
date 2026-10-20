@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, section } from './engine';
 import {
   ajouterReseau,
+  diametreParDefaut,
+  poserReseau,
+  retirerReseauTroncon,
   insererRegard,
   normaliserProjet,
   nouveauRegard,
@@ -32,6 +35,7 @@ function tronconNu(partiel: Partial<Troncon> = {}): Troncon {
 function projet(t: Troncon, H1: number, H2: number, ep: [number, number] = [100, 100]): Projet {
   return {
     nom: 't',
+    saisie: 'altitudes',
     reseaux: [
       { id: EU, nom: 'EU', couleur: '#000' },
       { id: EP, nom: 'EP', couleur: '#00f' },
@@ -272,6 +276,26 @@ describe('édition du tracé et des réseaux', () => {
     expect(r.troncons.reduce((s, t) => s + t.longueur, 0)).toBeCloseTo(longueur, 9);
     expect(insererRegard(p, 4).troncons).toHaveLength(4);
     expect(insererRegard(p, 0).troncons).toHaveLength(4);
+  });
+
+  it('poser et retirer un réseau dans un tronçon', () => {
+    const p = projetExemple();
+    const [eu, ep] = p.reseaux.map((r) => r.id);
+    const t3 = p.troncons[2];
+    expect(t3.tuyaux.map((x) => x.reseau)).toEqual([eu]);
+    const pose = poserReseau(t3, ep, diametreParDefaut(p, ep), [eu, ep]);
+    expect(pose.tuyaux.map((x) => x.reseau)).toEqual([eu, ep]);
+    expect(pose.tuyaux[1].diametre).toBeCloseTo(0.4, 9);
+    // côte à côte, centrés, tranchée élargie à la somme des largeurs d'enrobage
+    // blocs de 0,50 m (EU Ø200) et 0,70 m (EP Ø400) sur [−0,60 ; 0,60]
+    expect(pose.tuyaux[0].position).toBeCloseTo(-0.35, 9);
+    expect(pose.tuyaux[1].position).toBeCloseTo(0.25, 9);
+    expect(pose.largeur).toBeCloseTo(0.5 + 0.7, 9);
+    expect(poserReseau(pose, ep, 0.3, [eu, ep])).toBe(pose);
+    const retire = retirerReseauTroncon(pose, ep);
+    expect(retire.tuyaux.map((x) => x.reseau)).toEqual([eu]);
+    expect(retire.tuyaux[0].position).toBeCloseTo(0, 9);
+    expect(retire.largeur).toBeCloseTo(pose.largeur, 9);
   });
 
   it('ajouter puis supprimer un réseau', () => {

@@ -75,8 +75,12 @@ export interface Troncon {
   optionsDecapage: OptionsMateriau;
 }
 
+/** Saisie des regards : altitudes TN et fil d'eau, ou seulement les profondeurs TN − FE */
+export type ModeSaisie = 'altitudes' | 'profondeurs';
+
 export interface Projet {
   nom: string;
+  saisie: ModeSaisie;
   /** Au moins un réseau */
   reseaux: Reseau[];
   regards: Regard[];

@@ -18,15 +18,15 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 
 1. **Réseaux** (haut de la colonne de gauche) : déclarer les réseaux qui partagent la
    tranchée (EU, EP…), chacun avec sa couleur.
-2. **Tracé** : saisir les regards dans l’ordre (nom, altitude TN, puis un fil d’eau par
-   réseau) et la longueur de chaque tronçon. Le bouton `+` d’un tronçon y
-   insère un regard intermédiaire (le tronçon est coupé en deux).
-3. **Tronçon** : cliquer un tronçon pour l’éditer et y poser un ou plusieurs tuyaux, chacun
-   rattaché à un réseau. La coupe transversale est dessinée à l’échelle, avec le regard
-   amont à gauche et le regard aval à droite (un puits par réseau, à son fil d’eau). Les poignées
-   orange se glissent pour régler la largeur, la pente de talus, le décapage, l’épaisseur
-   des couches ; cliquer un tuyau pour le déplacer et ajuster son enrobage. Le sélecteur
-   Amont / Milieu / Aval choisit la profondeur de la coupe affichée.
+2. **Tracé** : saisir les regards dans l’ordre et la longueur de chaque tronçon. Dans
+   chaque tronçon, cocher les réseaux posés et saisir leur diamètre. À chaque regard, on
+   renseigne les réseaux posés de part et d’autre, au choix :
+   - **TN + FE** : altitude du terrain naturel et fil d’eau de chaque réseau ;
+   - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
+     volumes ne dépendent que des profondeurs).
+3. **Tronçon** : cliquer un tronçon pour régler la tranchée, la position et l’enrobage des
+   tuyaux, la structure. La coupe transversale est dessinée à l’échelle, avec le regard
+   amont à gauche et le regard aval à droite (un puits par réseau).
 4. **Résultats** : volumes du tronçon à côté du formulaire, tableau de tous les tronçons
    et total global en bas de page. Export CSV (séparateur `;`, virgule décimale) et
    impression.

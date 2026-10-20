@@ -298,7 +298,8 @@ export default function App() {
               setSelection(null);
             }}
             onRegard={(i, r) => modifier((p) => ({ ...p, regards: p.regards.map((x, j) => (j === i ? r : x)) }))}
-            onLongueur={(i, l) => modifier((p) => ({ ...p, troncons: p.troncons.map((t, j) => (j === i ? { ...t, longueur: l } : t)) }))}
+            onTroncon={(i, t) => modifier((p) => ({ ...p, troncons: p.troncons.map((x, j) => (j === i ? t : x)) }))}
+            onSaisie={(saisie) => modifier((p) => ({ ...p, saisie }))}
             onInserer={(i) => {
               modifier((p) => insererRegard(p, i));
               setActif(Math.max(0, i - 1));
@@ -334,6 +335,7 @@ export default function App() {
             amont={projet.regards[index]}
             aval={projet.regards[index + 1]}
             reseaux={projet.reseaux}
+            saisie={projet.saisie}
             mode={mode}
             onChange={majTroncon}
             selection={selection}
@@ -349,6 +351,7 @@ export default function App() {
               amont={projet.regards[index]}
               aval={projet.regards[index + 1]}
               reseaux={projet.reseaux}
+              saisie={projet.saisie}
               onChange={majTroncon}
               selection={selection}
               onSelect={setSelection}

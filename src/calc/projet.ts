@@ -112,7 +112,54 @@ export function projetExemple(): Projet {
   t3.couches = [];
   t3.optionsDeblai.reutilise = true;
   t3.optionsDecapage.reutilise = true;
-  return { nom: 'Nouveau projet', reseaux: [eu, ep], regards, troncons: [t1, t2, t3] };
+  return { nom: 'Nouveau projet', saisie: 'altitudes', reseaux: [eu, ep], regards, troncons: [t1, t2, t3] };
+}
+
+/** Diamètre proposé pour un réseau : celui de son dernier tuyau dans le projet, sinon 200 mm */
+export function diametreParDefaut(p: Projet, reseau: string): number {
+  for (let i = p.troncons.length - 1; i >= 0; i--) {
+    const x = p.troncons[i].tuyaux.find((q) => q.reseau === reseau);
+    if (x) return x.diametre;
+  }
+  return 0.2;
+}
+
+/**
+ * Pose un tuyau du réseau dans le tronçon. Les tuyaux sont rangés dans l'ordre des
+ * réseaux puis placés côte à côte ; la tranchée est élargie si nécessaire.
+ */
+export function poserReseau(t: Troncon, reseau: string, diametre: number, ordre: string[]): Troncon {
+  if (t.tuyaux.some((x) => x.reseau === reseau)) return t;
+  const modele = t.tuyaux[t.tuyaux.length - 1];
+  const nouveau = nouveauTuyau(reseau, diametre);
+  if (modele) {
+    nouveau.paroi = modele.paroi;
+    nouveau.enrobage = { ...modele.enrobage };
+  }
+  const tries = [...t.tuyaux, nouveau].sort((a, b) => ordre.indexOf(a.reseau) - ordre.indexOf(b.reseau));
+  const r = repartirTuyaux(tries);
+  return { ...t, tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) };
+}
+
+/**
+ * Change le diamètre des tuyaux d'un réseau dans le tronçon. Si les enrobages se
+ * recouvrent ou sortent de la tranchée, les tuyaux sont replacés côte à côte.
+ */
+export function changerDiametre(t: Troncon, reseau: string, diametre: number): Troncon {
+  const tuyaux = t.tuyaux.map((x) => (x.reseau === reseau ? { ...x, diametre } : x));
+  const blocs = tuyaux.map((x) => [x.position - x.diametre / 2 - x.enrobage.gauche, x.position + x.diametre / 2 + x.enrobage.droite]);
+  const dehors = blocs.some(([a, b]) => a < -t.largeur / 2 - 1e-9 || b > t.largeur / 2 + 1e-9);
+  const recouvrement = blocs.some(([a, b], i) => blocs.some(([c, d], j) => j > i && a < d - 1e-9 && c < b - 1e-9));
+  if (!dehors && !recouvrement) return { ...t, tuyaux };
+  const r = repartirTuyaux(tuyaux);
+  return { ...t, tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) };
+}
+
+/** Retire les tuyaux du réseau du tronçon et replace les autres côte à côte (largeur conservée) */
+export function retirerReseauTroncon(t: Troncon, reseau: string): Troncon {
+  const reste = t.tuyaux.filter((x) => x.reseau !== reseau);
+  if (reste.length === t.tuyaux.length) return t;
+  return { ...t, tuyaux: repartirTuyaux(reste).tuyaux };
 }
 
 /** Ajoute un réseau ; son fil d'eau aux regards part de celui du premier réseau, relevé de 30 cm */
@@ -292,5 +339,11 @@ export function normaliserProjet(brut: unknown): Projet {
     optionsDeblai: options(t?.optionsDeblai, base.optionsDeblai),
     optionsDecapage: options(t?.optionsDecapage, base.optionsDecapage),
   }));
-  return { nom: typeof o.nom === 'string' ? o.nom : 'Projet', reseaux, regards, troncons };
+  return {
+    nom: typeof o.nom === 'string' ? o.nom : 'Projet',
+    saisie: o.saisie === 'profondeurs' ? 'profondeurs' : 'altitudes',
+    reseaux,
+    regards,
+    troncons,
+  };
 }

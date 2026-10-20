@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, section } from '../calc/engine';
-import type { Regard, Reseau, Troncon, Tuyau } from '../calc/types';
+import type { ModeSaisie, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
 import { arrondir, fmt } from '../utils/format';
 
 export type ModeCoupe = 'amont' | 'moyenne' | 'aval';
@@ -11,6 +11,8 @@ interface Props {
   amont: Regard;
   aval: Regard;
   reseaux: Reseau[];
+  /** En saisie par profondeurs, les altitudes ne sont pas affichées */
+  saisie: ModeSaisie;
   mode: ModeCoupe;
   onChange: (t: Troncon) => void;
   selection: string | null;
@@ -93,7 +95,8 @@ interface Etiquette {
   classe: string;
 }
 
-export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onChange, selection, onSelect }: Props) {
+export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mode, onChange, selection, onSelect }: Props) {
+  const altitudes = saisie === 'altitudes';
   const svgRef = useRef<SVGSVGElement>(null);
   const boiteRef = useRef<HTMLDivElement>(null);
   const [largeurBoite, setLargeurBoite] = useState(980);
@@ -313,7 +316,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
           {r.nom || '—'}
         </text>
         <text x={x0 + JAUGE / 2} y={Yz(0) - 8} className="jauge-alt" textAnchor="middle">
-          TN {fmt(r.tn, 2)}
+          {altitudes ? `TN ${fmt(r.tn, 2)}` : 'TN'}
         </text>
         <line x1={x0 + 2} x2={x0 + JAUGE - 2} y1={Yz(0)} y2={Yz(0)} className="sol-ligne" />
         {Hr > 0 && <line x1={x0 + 2} x2={x0 + JAUGE - 2} y1={Yz(Hr)} y2={Yz(Hr)} className="jauge-fond" />}
@@ -345,7 +348,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
           <g key={`fe-${p.res.id}`} style={{ color: p.res.couleur }}>
             <circle cx={x0 + 10} cy={yTexteFe + k * LIGNE_FE - 4} r={4} className="jauge-radier" />
             <text x={x0 + 18} y={yTexteFe + k * LIGNE_FE} className="jauge-fe">
-              {gab.compact ? fmt(p.fe, 2) : `${p.res.nom} ${fmt(p.fe, 2)}`}
+              {altitudes
+                ? gab.compact
+                  ? fmt(p.fe, 2)
+                  : `${p.res.nom} ${fmt(p.fe, 2)}`
+                : gab.compact
+                  ? `${fmt(p.D, 2)} m`
+                  : `${p.res.nom} ${fmt(p.D, 2)} m`}
             </text>
           </g>
         ))}
@@ -579,7 +588,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, mode, onCh
                     {reseau(g.tuyau.reseau)?.nom} Ø{fmt(g.tuyau.diametre * 1000, 0)}
                   </strong>
                   <span>
-                    FE {fmt(fe, 2)} · prof. {fmt(tn - fe, 2)} m
+                    {altitudes && `FE ${fmt(fe, 2)} · `}prof. {fmt(tn - fe, 2)} m
                   </span>
                 </button>
               </li>
