@@ -2095,3 +2095,9 @@ fieldset.bloc-form:disabled {
   justify-content: center;
   margin-top: 0.35rem;
 }
+
+/* Diamètre affiché après le nom du réseau, aux 3/4 de sa taille */
+.tuyau-diametre {
+  font-size: 0.75em;
+  font-weight: 600;
+}

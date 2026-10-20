@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, materiauxEnrobage, nomMateriau, section } from '../calc/engine';
+import { etatCoupe, filDEauRegard, geometrieTuyaux, largeurFouille, materiauxEnrobage, nomMateriau, section } from '../calc/engine';
 import { changerEcart, classeMateriau, deplacerTuyau, ecartsTuyaux, NOMS_COUCHES, nouvelleCouche, repartirTuyaux, tuyauxGaucheDroite } from '../calc/projet';
 import type { ModeSaisie, Regard, Reseau, Troncon } from '../calc/types';
 import { fmt } from '../utils/format';
@@ -126,7 +126,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
   const reseauxRegard = presents.length ? presents : reseaux.slice(0, 1);
 
   const u = mode === 'amont' ? 0 : mode === 'aval' ? 1 : 0.5;
-  const tn = amont.tn + (aval.tn - amont.tn) * u;
   const etat = etatCoupe(t, amont, aval, u);
   const H = Math.max(0.05, etat.H);
   const H1 = etatCoupe(t, amont, aval, 0).H;
@@ -222,8 +221,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
       epaisseur: { valeur: zHautEnrobage - zBasStructure },
     });
   }
-  // Les tuyaux portent leur nom sur le dessin ; leur détail est listé sous la coupe, de gauche à droite.
-  const tuyauxListe = [...geoms].sort((a, b) => a.cx - b.cx);
   // Une étiquette par nature d'enrobage, accrochée au bloc le plus à droite de cette nature
   materiauxEnrobage(t).forEach((nomM, k) => {
     const blocs = geoms.filter((g) => nomMateriau(g.tuyau.enrobage.materiau).toLowerCase() === nomM.toLowerCase());
@@ -327,13 +324,22 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
 
   // Nom du réseau dans le tuyau s'il y tient, sinon au-dessus, à condition de ne pas
   // chevaucher un autre nom (sinon la couleur et la liste sous la coupe suffisent).
-  const nomsTuyaux = new Map<string, 'dedans' | 'dessus'>();
+  const nomsTuyaux = new Map<string, 'dedans' | 'deux-lignes' | 'dessus'>();
   const boites: [number, number, number][] = [];
   for (const g of geoms) {
     const nom = reseau(g.tuyau.reseau)?.nom ?? '';
-    const largeur = nom.length * 6.6 + 4;
-    if (2 * (g.r * s - Math.max(3, g.tuyau.paroi * s)) >= largeur) {
+    // nom du réseau, puis le diamètre en caractères 3/4 plus petits
+    const lNom = nom.length * 6.6;
+    const lDia = ` Ø${Math.round(g.tuyau.diametre * 1000)}`.length * 5;
+    const largeur = lNom + lDia + 4;
+    const interieur = 2 * (g.r * s - Math.max(3, g.tuyau.paroi * s));
+    if (interieur >= largeur) {
       nomsTuyaux.set(g.tuyau.id, 'dedans');
+      continue;
+    }
+    // sinon, nom et diamètre l'un sous l'autre dans le tuyau, s'ils y tiennent
+    if (interieur >= Math.max(lNom, lDia) + 2 && interieur >= 20) {
+      nomsTuyaux.set(g.tuyau.id, 'deux-lignes');
       continue;
     }
     if (gab.compact) continue;
@@ -503,6 +509,19 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
             </button>
           ))}
         </div>
+        {tries.length > 1 && !verrouille && (
+          <button
+            type="button"
+            className="btn btn-leger btn-petit"
+            onClick={() => {
+              const r = repartirTuyaux(tries);
+              onChange({ ...t, tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
+            }}
+            title="Écarts ramenés à des enrobages jointifs, tuyaux centrés"
+          >
+            Enrobages jointifs
+          </button>
+        )}
         <span className={`groupe-option groupe-decapage ${t.decapage.actif ? 'groupe-actif' : ''}`}>
         <label className="case">
           <input
@@ -719,7 +738,15 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
               {sel && <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s + 4} className="tuyau-halo" />}
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s} className="tuyau-paroi" />
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={Math.max(1, g.r * s - ep)} className="tuyau-int" />
-              {nomsTuyaux.has(g.tuyau.id) && (
+              {nomsTuyaux.get(g.tuyau.id) === 'deux-lignes' && (
+                <text x={X(g.cx)} y={Yy(g.cy) - 1} textAnchor="middle" className="tuyau-texte">
+                  {reseau(g.tuyau.reseau)?.nom}
+                  <tspan x={X(g.cx)} dy={9} className="tuyau-diametre">
+                    Ø{fmt(g.tuyau.diametre * 1000, 0)}
+                  </tspan>
+                </text>
+              )}
+              {(nomsTuyaux.get(g.tuyau.id) === 'dedans' || nomsTuyaux.get(g.tuyau.id) === 'dessus') && (
                 <text
                   x={X(g.cx)}
                   y={nomsTuyaux.get(g.tuyau.id) === 'dedans' ? Yy(g.cy) + 4 : Yy(g.cy + g.r) - 5}
@@ -727,6 +754,9 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
                   className={`tuyau-texte ${nomsTuyaux.get(g.tuyau.id) === 'dedans' ? '' : 'tuyau-texte-ext'}`}
                 >
                   {reseau(g.tuyau.reseau)?.nom}
+                  <tspan className="tuyau-diametre" dx={3}>
+                    Ø{fmt(g.tuyau.diametre * 1000, 0)}
+                  </tspan>
                 </text>
               )}
             </g>
@@ -858,7 +888,13 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
 
         {/* Ajout d'une couche, juste au-dessus des couches de structure */}
         {!gab.compact && !verrouille && (
-          <foreignObject x={m.xEtiquettes} y={Math.max(4, (etiquettes[0]?.y ?? Yz(0)) - CHAMP_H - 8)} width={120} height={CHAMP_H} className="champ-coupe">
+          <foreignObject
+            x={m.xEtiquettes + 20 + CHAMP_L}
+            y={Math.max(4, (etiquettes[0]?.y ?? Yz(0)) - CHAMP_H - 8)}
+            width={120}
+            height={CHAMP_H}
+            className="champ-coupe"
+          >
             {boutonCouche}
           </foreignObject>
         )}
@@ -875,41 +911,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
         {/* seulement s'il y a la place : sinon les valeurs restent lisibles dans Réseaux */}
         {selectionne && !gab.compact && (selectionne.bloc.x1 - selectionne.bloc.x0) * s >= 2.4 * 44 && enrobageSurCoupe(selectionne)}
       </svg>
-      {tuyauxListe.length > 0 && (
-        <ul className="liste-reseaux-coupe" aria-label="Tuyaux de la coupe, de gauche à droite">
-          {tuyauxListe.map((g) => {
-            const fe = filDEauTuyau(g.tuyau, amont, aval, u);
-            return (
-              <li key={g.tuyau.id}>
-                <button
-                  type="button"
-                  className={g.tuyau.id === idSel ? 'actif' : ''}
-                  style={{ '--pastille': couleur(g.tuyau.reseau) } as CSSProperties}
-                  onClick={() => onSelect(g.tuyau.id)}
-                >
-                  <strong>
-                    {reseau(g.tuyau.reseau)?.nom} Ø{fmt(g.tuyau.diametre * 1000, 0)}
-                  </strong>
-                  <span>
-                    {altitudes && `FE ${fmt(fe, 2)} · `}prof. {fmt(tn - fe, 2)} m
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {tries.length > 1 && <div className="jointif"><button
-          type="button"
-          className="btn btn-leger btn-petit"
-          onClick={() => {
-            const r = repartirTuyaux(tries);
-            onChange({ ...t, tuyaux: r.tuyaux, largeur: t.largeurAuto ? r.largeur : Math.max(t.largeur, r.largeur) });
-          }}
-          title="Écarts ramenés à des enrobages jointifs, tuyaux centrés"
-        >
-          Enrobages jointifs
-        </button></div>}
       {gab.compact && selectionne && (
         <div className="saisie-tuyau" style={{ '--pastille': couleur(selectionne.tuyau.reseau) } as CSSProperties}>
           <strong>
