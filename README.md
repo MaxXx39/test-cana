@@ -25,10 +25,12 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
    - **TN + FE** : altitude du terrain naturel et fil d’eau de chaque réseau ;
    - **Profondeurs** : seulement la profondeur TN − fil d’eau de chaque réseau (les
      volumes ne dépendent que des profondeurs).
-3. **Tronçon** : cliquer un tronçon (vignette de sa coupe dans le Tracé) pour régler la
-   tranchée (largeur, automatique ou non, blindage en U), l’écart entre tuyaux, leur
-   enrobage, la structure. La coupe transversale est dessinée à l’échelle, avec le regard
-   amont à gauche et le regard aval à droite (un puits par réseau).
+3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa vue générale (coupe complète,
+   regards amont et aval) s’ouvre sous lui, avec « Dupliquer vers… » pour recopier sa
+   tranchée (et au choix ses tuyaux) vers d’autres tronçons. Les autres tronçons montrent
+   une vignette. La fiche du tronçon règle la tranchée (largeur, automatique ou non,
+   blindage en U), l’écart entre tuyaux, leur enrobage et la structure. La coupe est
+   dessinée à l’échelle, regard amont à gauche et aval à droite (un puits par réseau).
 4. **Résultats** : volumes du tronçon à côté du formulaire, tableau de tous les tronçons
    et total global en bas de page. Export CSV (séparateur `;`, virgule décimale) et
    impression.

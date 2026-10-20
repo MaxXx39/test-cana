@@ -1625,3 +1625,53 @@ th {
   fill: var(--texte-2);
   opacity: 0.6;
 }
+
+/* ---------- Vue générale dans le tracé ---------- */
+.troncon-select-actif {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.vue-generale {
+  margin-top: 0.3rem;
+  padding: 0.5rem;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--panneau);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.vue-generale-barre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.duplication {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-doux);
+}
+
+.duplication-titre {
+  font-weight: 600;
+}
+
+.duplication-cibles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.duplication .aide {
+  margin: 0;
+}

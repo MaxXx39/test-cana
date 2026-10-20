@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ModeSaisie, Projet, Regard, Reseau, Troncon } from '../calc/types';
 import type { ResultatTroncon } from '../calc/engine';
 import { changerDiametre, COULEURS_RESEAUX, diametreParDefaut, poserReseau, retirerReseauTroncon } from '../calc/projet';
@@ -9,6 +10,8 @@ interface Props {
   projet: Projet;
   resultats: ResultatTroncon[];
   actif: number;
+  /** Vue générale de la tranchée du tronçon actif, affichée sous lui */
+  vueGenerale: ReactNode;
   onSelect: (index: number) => void;
   onSaisie: (mode: ModeSaisie) => void;
   onRegard: (index: number, r: Regard) => void;
@@ -33,6 +36,7 @@ export function Trace({
   projet,
   resultats,
   actif,
+  vueGenerale,
   onSelect,
   onSaisie,
   onRegard,
@@ -217,8 +221,8 @@ export function Trace({
             {t && (
               <div className={`troncon-bloc ${i === actif ? 'troncon-actif' : ''}`}>
                 <div className="troncon-ligne">
-                  <button type="button" className="troncon-select" onClick={() => onSelect(i)} aria-pressed={i === actif} title="Afficher ce tronçon">
-                    <MiniCoupe troncon={t} amont={r} aval={regards[i + 1]} reseaux={reseaux} />
+                  <button type="button" className={`troncon-select ${i === actif ? 'troncon-select-actif' : ''}`} onClick={() => onSelect(i)} aria-pressed={i === actif} title="Afficher ce tronçon">
+                    {i !== actif && <MiniCoupe troncon={t} amont={r} aval={regards[i + 1]} reseaux={reseaux} />}
                     <span className="troncon-textes">
                       <span className="troncon-titre">Tronçon {i + 1}</span>
                       <span className="troncon-sous">
@@ -232,6 +236,7 @@ export function Trace({
                     +
                   </button>
                 </div>
+                {i === actif && vueGenerale}
               </div>
             )}
           </div>

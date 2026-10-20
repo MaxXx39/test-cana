@@ -4,6 +4,7 @@ import {
   ajouterReseau,
   changerDiametre,
   changerEcart,
+  dupliquerVers,
   ecartsTuyaux,
   tuyauxGaucheDroite,
   diametreParDefaut,
@@ -333,6 +334,29 @@ describe('édition du tracé et des réseaux', () => {
     // pas de blindage en V
     const v = calculTroncon(projet(tronconNu({ type: 'V', fruit: 0, largeur: 1, blindage: 0.05 }), 2, 2), 0);
     expect(v.fouille).toBeCloseTo(20, 9);
+  });
+
+  it('dupliquer une tranchée vers d’autres tronçons', () => {
+    const p = projetExemple();
+    const source = p.troncons[0];
+    // tranchée et structure seulement : le tronçon 3 garde son EU seul et sa longueur
+    const q = dupliquerVers(p, 0, [2], { tuyaux: false });
+    const t3 = q.troncons[2];
+    expect(t3.id).toBe(p.troncons[2].id);
+    expect(t3.longueur).toBe(28);
+    expect(t3.type).toBe('U');
+    expect(t3.blindage).toBe(source.blindage);
+    expect(t3.couches.map((c) => [c.nom, c.epaisseur])).toEqual(source.couches.map((c) => [c.nom, c.epaisseur]));
+    expect(t3.couches[0].id).not.toBe(source.couches[0].id);
+    expect(t3.tuyaux.map((x) => x.reseau)).toEqual([p.reseaux[0].id]);
+    expect(q.troncons[1]).toBe(p.troncons[1]);
+    // avec les tuyaux : mêmes réseaux, diamètres et positions, nouveaux identifiants
+    const r = dupliquerVers(p, 0, [1, 2], { tuyaux: true });
+    for (const i of [1, 2]) {
+      expect(r.troncons[i].tuyaux.map((x) => [x.reseau, x.diametre, x.position])).toEqual(source.tuyaux.map((x) => [x.reseau, x.diametre, x.position]));
+      expect(r.troncons[i].tuyaux[0].id).not.toBe(source.tuyaux[0].id);
+    }
+    expect(r.troncons[1].longueur).toBe(42.5);
   });
 
   it('ajouter puis supprimer un réseau', () => {

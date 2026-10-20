@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
 import { ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
@@ -100,6 +100,8 @@ interface Etiquette {
 export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mode, onChange, selection, onSelect }: Props) {
   const altitudes = saisie === 'altitudes';
   const svgRef = useRef<SVGSVGElement>(null);
+  // Les découpes dépendent de l'échelle : identifiants propres à chaque coupe affichée
+  const idBase = `coupe${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const boiteRef = useRef<HTMLDivElement>(null);
   const [largeurBoite, setLargeurBoite] = useState(980);
   useEffect(() => {
@@ -422,10 +424,10 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
         onPointerDown={() => onSelect(null)}
       >
         <defs>
-          <clipPath id="clip-tranchee">
+          <clipPath id={`${idBase}-fouille`}>
             <polygon points={tranchee} />
           </clipPath>
-          <clipPath id="clip-utile">
+          <clipPath id={`${idBase}-utile`}>
             <polygon points={utile} />
           </clipPath>
           <pattern id="hachures-blindage" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
@@ -450,7 +452,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
 
         {/* Tranchée : remblai, enrobages, structure */}
         <polygon points={tranchee} className="remblai" />
-        <g clipPath="url(#clip-utile)">
+        <g clipPath={`url(#${idBase}-utile)`}>
           {geoms.map((g) => (
             <rect
               key={g.tuyau.id}
@@ -473,7 +475,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
             />
           ))}
         </g>
-        <g clipPath="url(#clip-tranchee)">
+        <g clipPath={`url(#${idBase}-fouille)`}>
           {sec.bornesCouches.map(([z1, z2], i) =>
             z2 > z1 ? <polygon key={t.couches[i].id} points={bande(z1, z2)} className={`couche couche-${i % 6}`} /> : null,
           )}

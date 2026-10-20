@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calculProjet } from './calc/engine';
-import { ajouterReseau, ajusterLargeur, dupliquerTroncon, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
+import { ajouterReseau, ajusterLargeur, dupliquerVers, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
 import type { Projet, Reseau, Troncon } from './calc/types';
 import { CoupeTransversale, type ModeCoupe } from './components/CoupeTransversale';
 import { DetailTroncon, TableauTroncons, TotalGlobal } from './components/Resultats';
 import { Trace } from './components/Trace';
+import { Duplication } from './components/Duplication';
+import type { OptionsDuplication } from './calc/projet';
 import { TronconEditor } from './components/TronconEditor';
 import { exportCsv } from './utils/export';
 import { fmt, telecharger } from './utils/format';
@@ -127,18 +129,10 @@ export default function App() {
     modifier((p) => ({ ...p, troncons: p.troncons.map((x, i) => (i === index ? n : x)) }));
   };
 
-  const appliquerATous = () =>
-    setConfirmation({
-      texte: `Appliquer la tranchée, les tuyaux, la structure et les options du tronçon ${index + 1} à tous les autres tronçons ? Les longueurs sont conservées.`,
-      libelle: 'Appliquer à tous',
-      action: () => {
-        modifier((p) => ({
-          ...p,
-          troncons: p.troncons.map((t, i) => (i === index ? t : { ...dupliquerTroncon(troncon, t.longueur), id: t.id })),
-        }));
-        setMessage('Paramètres appliqués à tous les tronçons.');
-      },
-    });
+  const dupliquer = (cibles: number[], options: OptionsDuplication) => {
+    modifier((p) => dupliquerVers(p, index, cibles, options));
+    setMessage(`Tranchée du tronçon ${index + 1} dupliquée vers ${cibles.length} tronçon${cibles.length > 1 ? 's' : ''}.`);
+  };
 
   const copierTableur = async () => {
     const texte = exportCsv(projet.nom, resultats.troncons, resultats.global, '\t');
@@ -162,12 +156,6 @@ export default function App() {
       });
   };
 
-  const copierPrecedent = () => {
-    if (index === 0) return;
-    const prec = projet.troncons[index - 1];
-    majTroncon({ ...dupliquerTroncon(prec, troncon.longueur), id: troncon.id });
-  };
-
   const ouvrir = async (f: File) => {
     try {
       const p = normaliserProjet(JSON.parse(await f.text()));
@@ -188,6 +176,37 @@ export default function App() {
         setActif(0);
       },
     });
+
+  const choixMode = (
+    <div className="segment segment-petit" role="radiogroup" aria-label="Coupe affichée">
+      {(['amont', 'moyenne', 'aval'] as ModeCoupe[]).map((m) => (
+        <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? 'actif' : ''} onClick={() => setMode(m)}>
+          {m === 'amont' ? 'Amont' : m === 'aval' ? 'Aval' : 'Milieu'}
+        </button>
+      ))}
+    </div>
+  );
+
+  /** Vue générale du tronçon actif, affichée dans le tracé sous ce tronçon */
+  const vueGenerale = (
+    <div className="vue-generale">
+      <div className="vue-generale-barre">
+        {choixMode}
+        <Duplication projet={projet} index={index} onDupliquer={dupliquer} />
+      </div>
+      <CoupeTransversale
+        troncon={troncon}
+        amont={projet.regards[index]}
+        aval={projet.regards[index + 1]}
+        reseaux={projet.reseaux}
+        saisie={projet.saisie}
+        mode={mode}
+        onChange={majTroncon}
+        selection={selection}
+        onSelect={setSelection}
+      />
+    </div>
+  );
 
   return (
     <div className="app">
@@ -297,6 +316,7 @@ export default function App() {
             projet={projet}
             resultats={resultats.troncons}
             actif={index}
+            vueGenerale={vueGenerale}
             onSelect={(i) => {
               setActif(i);
               setSelection(null);
@@ -324,15 +344,7 @@ export default function App() {
               Tronçon {index + 1} : {projet.regards[index].nom} → {projet.regards[index + 1].nom}
               <span className="titre-sous"> · {fmt(troncon.longueur, 2)} m</span>
             </h2>
-            <div className="actions">
-              <div className="segment segment-petit" role="radiogroup" aria-label="Coupe affichée">
-                {(['amont', 'moyenne', 'aval'] as ModeCoupe[]).map((m) => (
-                  <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? 'actif' : ''} onClick={() => setMode(m)}>
-                    {m === 'amont' ? 'Amont' : m === 'aval' ? 'Aval' : 'Milieu'}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="actions">{choixMode}</div>
           </div>
           <CoupeTransversale
             troncon={troncon}
@@ -364,12 +376,7 @@ export default function App() {
               <h3>Volumes du tronçon</h3>
               <DetailTroncon r={resultats.troncons[index]} />
               <div className="actions actions-col">
-                <button type="button" className="btn btn-leger" onClick={copierPrecedent} disabled={index === 0}>
-                  Copier les paramètres du tronçon précédent
-                </button>
-                <button type="button" className="btn btn-leger" onClick={appliquerATous} disabled={projet.troncons.length < 2}>
-                  Appliquer à tous les tronçons
-                </button>
+                <Duplication projet={projet} index={index} onDupliquer={dupliquer} />
               </div>
             </div>
           </div>

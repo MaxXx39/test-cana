@@ -238,6 +238,30 @@ export function retirerReseauTroncon(t: Troncon, reseau: string): Troncon {
   return recentrer({ ...t, tuyaux: reste }, t.largeurAuto);
 }
 
+/** Ce que l'on recopie d'un tronçon vers d'autres */
+export interface OptionsDuplication {
+  /** Tuyaux : réseaux, diamètres, écarts et enrobages (sinon les tuyaux de la cible sont gardés) */
+  tuyaux: boolean;
+}
+
+/**
+ * Recopie la tranchée d'un tronçon (type, largeur, blindage, talus, surface, décapage,
+ * structure, remblai, options des matériaux et, au choix, les tuyaux) vers d'autres
+ * tronçons. La longueur de chaque cible est conservée.
+ */
+export function dupliquerVers(p: Projet, source: number, cibles: number[], options: OptionsDuplication): Projet {
+  const modele = p.troncons[source];
+  return {
+    ...p,
+    troncons: p.troncons.map((t, i) => {
+      if (i === source || !cibles.includes(i)) return t;
+      const copie = { ...dupliquerTroncon(modele, t.longueur), id: t.id };
+      if (!options.tuyaux) copie.tuyaux = t.tuyaux;
+      return ajusterLargeur(copie);
+    }),
+  };
+}
+
 /** Ajoute un réseau ; son fil d'eau aux regards part de celui du premier réseau, relevé de 30 cm */
 export function ajouterReseau(p: Projet): Projet {
   const nom = `Réseau ${p.reseaux.length + 1}`;
