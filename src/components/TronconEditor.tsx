@@ -1,5 +1,6 @@
 import type { Couche, OptionsMateriau, Regard, Troncon, Tuyau } from '../calc/types';
 import { nouveauTuyau, nouvelleCouche } from '../calc/projet';
+import { profondeur } from '../calc/engine';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -47,6 +48,45 @@ function OptionsExtrait({ titre, options, onChange }: { titre: string; options: 
           unite="×"
           title="Coefficient de foisonnement"
         />
+      )}
+    </div>
+  );
+}
+
+/** Fil d'eau du tuyau : celui des regards, ou un fil d'eau propre pour un réseau à une autre profondeur */
+function FilDEau({
+  tuyau: p,
+  amont,
+  aval,
+  onChange,
+}: {
+  tuyau: Tuyau;
+  amont: Regard;
+  aval: Regard;
+  onChange: (fe: Tuyau['filDEau']) => void;
+}) {
+  const fe = p.filDEau;
+  return (
+    <div className="fil-d-eau">
+      <label className="case">
+        <input type="checkbox" checked={fe !== null} onChange={(e) => onChange(e.target.checked ? { amont: amont.fe, aval: aval.fe } : null)} />
+        Fil d’eau propre (réseau à une autre profondeur)
+      </label>
+      {fe ? (
+        <div className="grille-champs grille-serree">
+          <NumberField label={`FE amont (${amont.nom})`} value={fe.amont} onChange={(v) => onChange({ ...fe, amont: v })} decimales={2} pas={0.01} unite="m" />
+          <NumberField label={`FE aval (${aval.nom})`} value={fe.aval} onChange={(v) => onChange({ ...fe, aval: v })} decimales={2} pas={0.01} unite="m" />
+          <div className="champ">
+            <span className="champ-label">Prof. sous TN</span>
+            <span className="valeur-calculee">
+              {fmt(amont.tn - fe.amont, 2)} → {fmt(aval.tn - fe.aval, 2)} m
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="aide">
+          Suit le fil d’eau des regards : {fmt(amont.fe, 2)} → {fmt(aval.fe, 2)}.
+        </p>
       )}
     </div>
   );
@@ -124,8 +164,8 @@ export function TronconEditor({ troncon: t, amont, aval, onChange, selection, on
           )}
         </div>
         <p className="aide">
-          Profondeur de fouille : {fmt(amont.tn - amont.fe, 2)} m (TN − FE) en amont, {fmt(aval.tn - aval.fe, 2)} m en aval, plus le calage
-          sous fil d’eau (paroi + enrobage bas).
+          Profondeur de fouille : {fmt(profondeur(t, amont, aval, 0), 2)} m en amont, {fmt(profondeur(t, amont, aval, 1), 2)} m en aval. Le fond
+          est calé sous le réseau le plus profond (fil d’eau − paroi − enrobage bas).
         </p>
       </section>
 
@@ -204,6 +244,7 @@ export function TronconEditor({ troncon: t, amont, aval, onChange, selection, on
               <NumberField label="Paroi" value={p.paroi} onChange={(v) => majTuyau(p.id, { paroi: v })} echelle={1000} decimales={0} unite="mm" min={0} pas={1} title="Écart entre fil d’eau et génératrice inférieure extérieure" />
               <NumberField label="Position / axe" value={p.position} onChange={(v) => majTuyau(p.id, { position: v })} unite="m" pas={0.05} title="Décalage de l’axe du tuyau par rapport à l’axe de la tranchée (négatif = à gauche)" />
             </div>
+            <FilDEau tuyau={p} amont={amont} aval={aval} onChange={(filDEau) => majTuyau(p.id, { filDEau })} />
             <div className="enrobage-croix">
               <NumberField label="Haut" value={p.enrobage.haut} onChange={(v) => majEnrobage(p, 'haut', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
               <NumberField label="Gauche" value={p.enrobage.gauche} onChange={(v) => majEnrobage(p, 'gauche', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />

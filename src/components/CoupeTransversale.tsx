@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { calageSousFilDEau, geometrieTuyaux, section } from '../calc/engine';
+import { etatCoupe, filDEauTuyau, geometrieTuyaux, section } from '../calc/engine';
 import type { Regard, Troncon, Tuyau } from '../calc/types';
 import { arrondir, fmt } from '../utils/format';
 
@@ -98,17 +98,16 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
   const drag = useRef<Poignee | null>(null);
   const [gel, setGel] = useState<(Mise & { vbw: number }) | null>(null);
 
-  const calage = calageSousFilDEau(t);
-  const D1 = amont.tn - amont.fe;
-  const D2 = aval.tn - aval.fe;
-  const D = mode === 'amont' ? D1 : mode === 'aval' ? D2 : (D1 + D2) / 2;
-  const H = Math.max(0.05, D + calage);
-  const H1 = D1 + calage;
-  const H2 = D2 + calage;
+  const u = mode === 'amont' ? 0 : mode === 'aval' ? 1 : 0.5;
+  const tn = amont.tn + (aval.tn - amont.tn) * u;
+  const etat = etatCoupe(t, amont, aval, u);
+  const H = Math.max(0.05, etat.H);
+  const H1 = etatCoupe(t, amont, aval, 0).H;
+  const H2 = etatCoupe(t, amont, aval, 1).H;
   const f = t.type === 'V' ? Math.max(0, t.fruit) : 0;
   const W = t.largeur;
-  const sec = useMemo(() => section(t, H), [t, H]);
-  const geoms = useMemo(() => geometrieTuyaux(t), [t]);
+  const sec = section(t, H, etat.basTuyaux);
+  const geoms = geometrieTuyaux(t, etat.basTuyaux);
   const Wt = W + 2 * f * H;
 
   const largeurMonde = Math.max(Wt, ...geoms.map((g) => 2 * Math.max(Math.abs(g.bloc.x0), Math.abs(g.bloc.x1)))) * 1.3 + 0.3;
@@ -184,7 +183,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
           if (d.cote === 'gauche') e2.gauche = cmArrondi(g.cx - g.r - x);
           if (d.cote === 'droite') e2.droite = cmArrondi(x - g.cx - g.r);
           if (d.cote === 'haut') e2.haut = cmArrondi(y - (g.cy + g.r));
-          if (d.cote === 'bas') e2.bas = cmArrondi(z - D - p.paroi);
+          if (d.cote === 'bas') e2.bas = cmArrondi(z - (tn - filDEauTuyau(p, amont, aval, u)) - p.paroi);
           return { ...p, enrobage: e2 };
         });
         break;
@@ -276,8 +275,12 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
   const xG0 = m.xSection0 - 8;
   const xG1 = m.xSection1 + 8;
 
-  const jauge = (r: Regard, Hr: number, x0: number, titre: string, actif: boolean) => {
+  const jauge = (r: Regard, Hr: number, x0: number, titre: string, actif: boolean, ur: 0 | 1) => {
     const Dr = r.tn - r.fe;
+    // Fils d'eau des réseaux posés à une autre profondeur que celui du regard
+    const autres = t.tuyaux
+      .filter((p) => p.filDEau)
+      .map((p) => ({ id: p.id, nom: p.nom, fe: filDEauTuyau(p, amont, aval, ur) }));
     const xc = x0 + JAUGE / 2;
     const lp = gab.compact ? 30 : 58;
     const yFe = Math.max(Yz(Math.max(0, Dr)) + 22, Hr > Dr ? Yz(Hr) + 16 : 0);
@@ -295,6 +298,17 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
         {Hr > Dr && (
           <line x1={xc - lp / 2 - 12} x2={xc + lp / 2 + 12} y1={Yz(Hr)} y2={Yz(Hr)} className="jauge-fond" />
         )}
+        {autres.map((a) => (
+          <g key={a.id} className="jauge-reseau">
+            <title>{`${a.nom} : FE ${fmt(a.fe, 2)}`}</title>
+            <line x1={xc - lp / 2} x2={xc + lp / 2} y1={Yz(r.tn - a.fe)} y2={Yz(r.tn - a.fe)} />
+            {!gab.compact && (
+              <text x={xc + lp / 2 + 3} y={Yz(r.tn - a.fe) - 3} className="jauge-reseau-texte">
+                {fmt(a.fe, 2)}
+              </text>
+            )}
+          </g>
+        ))}
         <text x={xc} y={Yz(0) - 6} className="jauge-alt" textAnchor="middle">
           TN {fmt(r.tn, 2)}
         </text>
@@ -343,8 +357,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
         </pattern>
       </defs>
 
-      {jauge(amont, H1, PAD, 'Regard amont', mode === 'amont')}
-      {jauge(aval, H2, VBW - PAD - JAUGE, 'Regard aval', mode === 'aval')}
+      {jauge(amont, H1, PAD, 'Regard amont', mode === 'amont', 0)}
+      {jauge(aval, H2, VBW - PAD - JAUGE, 'Regard aval', mode === 'aval', 1)}
 
       {/* Terrain encaissant */}
       <rect x={xG0} y={Yz(0)} width={xG1 - xG0} height={(profondeurMax - 0.02) * s} className="sol" />
@@ -410,11 +424,19 @@ export function CoupeTransversale({ troncon: t, amont, aval, mode, onChange, sel
         </g>
       ))}
 
-      {/* Fil d'eau */}
-      <line x1={X(-hw(H - calage)) - 16} x2={X(0)} y1={Yy(calage)} y2={Yy(calage)} className="ligne-fe" />
-      <text x={X(-hw(H - calage)) - 18} y={Yy(calage) + 4} textAnchor="end" className="cote-texte">
-        FE
-      </text>
+      {/* Fil d'eau de chaque réseau */}
+      {geoms.map((g) => {
+        const yFe = g.cy - g.r + g.tuyau.paroi;
+        return (
+          <g key={g.tuyau.id}>
+            <title>{`${g.tuyau.nom} : FE ${fmt(filDEauTuyau(g.tuyau, amont, aval, u), 2)}`}</title>
+            <line x1={X(-hw(H - yFe)) - 16} x2={X(g.cx)} y1={Yy(yFe)} y2={Yy(yFe)} className="ligne-fe" />
+            <text x={X(-hw(H - yFe)) - 18} y={Yy(yFe) + 4} textAnchor="end" className="cote-texte">
+              FE
+            </text>
+          </g>
+        );
+      })}
 
       {/* Cotes */}
       <g className="cote">

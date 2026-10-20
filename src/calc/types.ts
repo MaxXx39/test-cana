@@ -29,6 +29,11 @@ export interface Tuyau {
   paroi: number;
   /** Position de l'axe du tuyau par rapport à l'axe de la tranchée (négatif = à gauche) */
   position: number;
+  /**
+   * Fil d'eau propre (altitudes aux regards amont et aval), pour un réseau posé à une
+   * autre profondeur que celui des regards. null : suit le fil d'eau des regards.
+   */
+  filDEau: { amont: number; aval: number } | null;
   enrobage: Enrobage;
 }
 

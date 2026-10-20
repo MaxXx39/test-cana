@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aireReunionBlocs, calculProjet, calculTroncon, profondeur, section } from './engine';
+import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, section } from './engine';
 import { insererRegard, normaliserProjet, nouveauRegard, nouveauTroncon, projetExemple, supprimerRegard } from './projet';
 import type { Projet, Troncon } from './types';
 
@@ -44,7 +44,8 @@ describe('volumes de fouille', () => {
         { ...nouveauTroncon().tuyaux[0], paroi: 0, position: 1, enrobage: { bas: 0.15, haut: 0.1, gauche: 0.1, droite: 0.1 } },
       ],
     });
-    expect(profondeur(nouveauRegard('A', 102, 100), t)).toBeCloseTo(2.15, 9);
+    const r = nouveauRegard('A', 102, 100);
+    expect(profondeur(t, r, r, 0)).toBeCloseTo(2.15, 9);
   });
 });
 
@@ -55,6 +56,7 @@ describe('enrobage', () => {
     diametre: 0.4,
     paroi: 0,
     position: 0,
+    filDEau: null,
     enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
   };
 
@@ -92,6 +94,59 @@ describe('enrobage', () => {
   });
 });
 
+describe('réseaux à des profondeurs différentes', () => {
+  const base = {
+    id: 'a',
+    nom: 'EU',
+    diametre: 0.4,
+    paroi: 0,
+    position: -0.5,
+    filDEau: null,
+    enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
+  };
+
+  it('le fond suit le réseau le plus profond, l’enrobage du réseau haut part de son lit', () => {
+    const t = tronconNu({
+      largeur: 2,
+      tuyaux: [base, { ...base, id: 'b', nom: 'EP', position: 0.5, filDEau: { amont: 100.5, aval: 100.5 } }],
+    });
+    const p = projet(t, 2, 2); // TN 102, FE des regards 100
+    const e = etatCoupe(t, p.regards[0], p.regards[1], 0);
+    expect(e.H).toBeCloseTo(2.1, 9);
+    expect(e.basTuyaux[0]).toBeCloseTo(0.1, 9);
+    expect(e.basTuyaux[1]).toBeCloseTo(0.6, 9);
+    const r = calculTroncon(p, 0);
+    // blocs [-0.9,-0.1]×[0,0.7] et [0.1,0.9]×[0.5,1.2]
+    expect(r.enrobage).toBeCloseTo(10 * (2 * 0.8 * 0.7 - 2 * Math.PI * 0.04), 9);
+    expect(r.remblai).toBeCloseTo(10 * (2 * 2.1 - 2 * 0.8 * 0.7), 9);
+  });
+
+  it('réseaux superposés : la réunion des enrobages est comptée une fois', () => {
+    const t = tronconNu({
+      largeur: 1,
+      tuyaux: [{ ...base, position: 0 }, { ...base, id: 'b', position: 0, filDEau: { amont: 100.6, aval: 100.6 } }],
+    });
+    const r = calculTroncon(projet(t, 2, 2), 0);
+    // blocs [−0.4,0.4]×[0,0.7] et [−0.4,0.4]×[0.6,1.3] → réunion 0.8 × 1.3
+    expect(r.enrobage).toBeCloseTo(10 * (0.8 * 1.3 - 2 * Math.PI * 0.04), 9);
+    expect(r.alertes.some((a) => a.includes('se recouvrent'))).toBe(true);
+    expect(r.alertes.some((a) => a.includes('se chevauchent'))).toBe(false);
+  });
+
+  it('le tuyau qui fixe le fond change le long du tronçon', () => {
+    const t = tronconNu({
+      largeur: 2,
+      tuyaux: [base, { ...base, id: 'b', position: 0.5, filDEau: { amont: 100.5, aval: 99.5 } }],
+    });
+    const r = calculTroncon(projet(t, 2, 2), 0);
+    expect(r.H1).toBeCloseTo(2.1, 9);
+    expect(r.H2).toBeCloseTo(2.6, 9);
+    // H = 2,1 jusqu'à mi-longueur puis 1,6 + u : hauteur moyenne 2,225
+    expect(r.fouille).toBeCloseTo(10 * 2 * 2.225, 9);
+    expect(r.surfaceBlindage).toBeCloseTo(2 * 10 * 2.225, 9);
+  });
+});
+
 describe('structure et décapage', () => {
   it('épaisseur × largeur × longueur en U', () => {
     const t = tronconNu({
@@ -119,7 +174,7 @@ describe('structure et décapage', () => {
     const t = tronconNu({
       largeur: 0.8,
       tuyaux: [
-        { id: 'p', nom: 'P', diametre: 0.4, paroi: 0, position: 0, enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
+        { id: 'p', nom: 'P', diametre: 0.4, paroi: 0, position: 0, filDEau: null, enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
       ],
       couches: [{ id: 'a', nom: 'Grave', epaisseur: 5 }],
     });

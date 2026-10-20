@@ -16,6 +16,7 @@ export function nouveauTuyau(nom = 'Tuyau 1', position = 0): Tuyau {
     diametre: 0.315,
     paroi: 0,
     position,
+    filDEau: null,
     enrobage: { bas: 0.1, haut: 0.15, gauche: 0.15, droite: 0.15 },
   };
 }
@@ -161,6 +162,10 @@ export function normaliserProjet(brut: unknown): Projet {
       diametre: nombre(p?.diametre, 0.315),
       paroi: nombre(p?.paroi, 0),
       position: nombre(p?.position, 0),
+      filDEau:
+        p?.filDEau && typeof p.filDEau === 'object'
+          ? { amont: nombre(p.filDEau.amont, 0), aval: nombre(p.filDEau.aval, 0) }
+          : null,
       enrobage: {
         bas: nombre(p?.enrobage?.bas, 0.1),
         haut: nombre(p?.enrobage?.haut, 0.15),

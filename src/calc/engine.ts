@@ -5,16 +5,47 @@ import type { OptionsMateriau, Projet, Regard, SurfaceNature, Troncon, Tuyau } f
  * y vertical, 0 au fond de fouille, positif vers le haut. H est la profondeur
  * totale de fouille (du terrain naturel au fond de fouille).
  *
- * Profondeur de fouille à un regard = TN − FE + calage sous fil d'eau, où le
- * calage est la plus grande valeur (épaisseur de paroi + enrobage bas) parmi les
- * tuyaux du tronçon. Tous les tuyaux d'un tronçon partagent le même fil d'eau.
+ * Chaque tuyau suit le fil d'eau des regards, ou son propre fil d'eau (réseau
+ * posé à une autre profondeur dans la même tranchée). Le fond de fouille, plat
+ * sur toute la largeur, est calé sous le tuyau le plus exigeant :
+ * fond = min(FE − paroi − enrobage bas). Le bloc d'enrobage d'un tuyau part de
+ * son propre lit ; sous un réseau plus haut, l'espace est remblayé.
  *
- * Entre deux regards, H varie linéairement. Les aires de section sont des
- * polynômes de degré ≤ 2 en H (hors cas d'écrêtage) : l'intégration de Simpson
- * le long du tronçon donne donc le volume exact.
+ * Le long du tronçon (abscisse relative u de 0 à 1), TN et fils d'eau varient
+ * linéairement. On intègre par Simpson entre les points où le tuyau qui fixe le
+ * fond change : sur chaque morceau, H est affine et l'intégration est exacte pour
+ * la fouille, le décapage et la structure (polynômes de degré ≤ 2 en H).
  */
 
 const SIMPSON_INTERVALLES = 20;
+
+const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
+
+/** Fil d'eau d'un tuyau à l'abscisse relative u */
+export function filDEauTuyau(p: Tuyau, amont: Regard, aval: Regard, u: number): number {
+  return p.filDEau ? lerp(p.filDEau.amont, p.filDEau.aval, u) : lerp(amont.fe, aval.fe, u);
+}
+
+/** Géométrie verticale d'une coupe : profondeur et hauteur des tuyaux au-dessus du fond */
+export interface EtatCoupe {
+  H: number;
+  /** Hauteur de la génératrice inférieure extérieure de chaque tuyau au-dessus du fond */
+  basTuyaux: number[];
+}
+
+export function etatCoupe(t: Troncon, amont: Regard, aval: Regard, u: number): EtatCoupe {
+  const tn = lerp(amont.tn, aval.tn, u);
+  if (t.tuyaux.length === 0) return { H: tn - lerp(amont.fe, aval.fe, u), basTuyaux: [] };
+  const bas = t.tuyaux.map((p) => filDEauTuyau(p, amont, aval, u) - p.paroi);
+  const fond = Math.min(...t.tuyaux.map((p, i) => bas[i] - p.enrobage.bas));
+  return { H: tn - fond, basTuyaux: bas.map((b) => b - fond) };
+}
+
+/** Hauteurs des tuyaux quand tous suivent le même fil d'eau */
+export function basTuyauxUniformes(t: Troncon): number[] {
+  const calage = calageSousFilDEau(t);
+  return t.tuyaux.map((p) => calage - p.paroi);
+}
 
 export interface Rect {
   x0: number;
@@ -36,8 +67,9 @@ export function calageSousFilDEau(t: Troncon): number {
   return Math.max(...t.tuyaux.map((p) => p.paroi + p.enrobage.bas));
 }
 
-export function profondeur(r: Regard, t: Troncon): number {
-  return r.tn - r.fe + calageSousFilDEau(t);
+/** Profondeur de fouille au regard amont (u = 0) ou aval (u = 1) du tronçon */
+export function profondeur(t: Troncon, amont: Regard, aval: Regard, u: 0 | 1): number {
+  return etatCoupe(t, amont, aval, u).H;
 }
 
 function fruitEffectif(t: Troncon): number {
@@ -49,11 +81,10 @@ export function demiLargeur(t: Troncon, y: number): number {
   return t.largeur / 2 + fruitEffectif(t) * y;
 }
 
-export function geometrieTuyaux(t: Troncon): GeomTuyau[] {
-  const calage = calageSousFilDEau(t);
-  return t.tuyaux.map((p) => {
+export function geometrieTuyaux(t: Troncon, basTuyaux: number[] = basTuyauxUniformes(t)): GeomTuyau[] {
+  return t.tuyaux.map((p, i) => {
     const r = p.diametre / 2;
-    const yBas = calage - p.paroi;
+    const yBas = basTuyaux[i];
     return {
       tuyau: p,
       cx: p.position,
@@ -62,7 +93,7 @@ export function geometrieTuyaux(t: Troncon): GeomTuyau[] {
       bloc: {
         x0: p.position - r - p.enrobage.gauche,
         x1: p.position + r + p.enrobage.droite,
-        y0: 0,
+        y0: Math.max(0, yBas - p.enrobage.bas),
         y1: yBas + p.diametre + p.enrobage.haut,
       },
     };
@@ -101,6 +132,7 @@ export function aireReunionBlocs(t: Troncon, blocs: Rect[], H: number): number {
   if (yMax <= 0) return 0;
   const ruptures = new Set<number>([0, yMax]);
   for (const b of blocs) {
+    if (b.y0 > 0 && b.y0 < yMax) ruptures.add(b.y0);
     if (b.y1 > 0 && b.y1 < yMax) ruptures.add(b.y1);
     if (f > 0) {
       for (const x of [b.x0, b.x1]) {
@@ -149,13 +181,13 @@ function aireBandeHaut(t: Troncon, H: number, z1: number, z2: number): number {
   return (b - a) * (t.largeur + 2 * f * H) - f * (b * b - a * a);
 }
 
-export function section(t: Troncon, Hbrut: number): Section {
+export function section(t: Troncon, Hbrut: number, basTuyaux: number[] = basTuyauxUniformes(t)): Section {
   const H = Math.max(0, Hbrut);
   const f = fruitEffectif(t);
   const fouille = t.largeur * H + f * H * H;
   const decapage = t.decapage.actif ? aireBandeHaut(t, H, 0, t.decapage.epaisseur) : 0;
 
-  const geoms = geometrieTuyaux(t);
+  const geoms = geometrieTuyaux(t, basTuyaux);
   const blocs = geoms.map((g) => g.bloc);
   const hautEnrobage = Math.min(H, blocs.length ? Math.max(...blocs.map((b) => b.y1)) : 0);
   const aireBlocs = aireReunionBlocs(t, blocs, H);
@@ -189,15 +221,39 @@ export function section(t: Troncon, Hbrut: number): Section {
   };
 }
 
-/** Moyenne d'une grandeur de section le long du tronçon (Simpson) */
-function moyenneLongueur(H1: number, H2: number, g: (H: number) => number): number {
-  const n = SIMPSON_INTERVALLES;
-  let s = 0;
-  for (let i = 0; i <= n; i++) {
-    const w = i === 0 || i === n ? 1 : i % 2 === 1 ? 4 : 2;
-    s += w * g(H1 + ((H2 - H1) * i) / n);
+/** Abscisses relatives où le tuyau qui fixe le fond de fouille peut changer */
+function ruptures(t: Troncon, amont: Regard, aval: Regard): number[] {
+  const cote = (p: Tuyau, u: number) => filDEauTuyau(p, amont, aval, u) - p.paroi - p.enrobage.bas;
+  const us = [0, 1];
+  for (let i = 0; i < t.tuyaux.length; i++) {
+    for (let j = i + 1; j < t.tuyaux.length; j++) {
+      const d0 = cote(t.tuyaux[i], 0) - cote(t.tuyaux[j], 0);
+      const d1 = cote(t.tuyaux[i], 1) - cote(t.tuyaux[j], 1);
+      if (d0 * d1 < 0) us.push(d0 / (d0 - d1));
+    }
   }
-  return s / (3 * n);
+  return [...new Set(us)].sort((a, b) => a - b);
+}
+
+type Grandeurs = Pick<Section, 'H' | 'fouille' | 'decapage' | 'deblai' | 'enrobage' | 'tuyaux' | 'remblai' | 'largeurTete' | 'couches'>;
+const CHAMPS = ['H', 'fouille', 'decapage', 'deblai', 'enrobage', 'tuyaux', 'remblai', 'largeurTete'] as const;
+
+/** Moyennes des grandeurs de section le long du tronçon (Simpson par morceaux) */
+function moyennesLongueur(t: Troncon, amont: Regard, aval: Regard): Grandeurs {
+  const m: Grandeurs = { H: 0, fouille: 0, decapage: 0, deblai: 0, enrobage: 0, tuyaux: 0, remblai: 0, largeurTete: 0, couches: t.couches.map(() => 0) };
+  const us = ruptures(t, amont, aval);
+  const n = SIMPSON_INTERVALLES;
+  for (let k = 0; k + 1 < us.length; k++) {
+    const [ua, ub] = [us[k], us[k + 1]];
+    for (let i = 0; i <= n; i++) {
+      const w = ((i === 0 || i === n ? 1 : i % 2 === 1 ? 4 : 2) * (ub - ua)) / (3 * n);
+      const e = etatCoupe(t, amont, aval, lerp(ua, ub, i / n));
+      const sec = section(t, e.H, e.basTuyaux);
+      for (const c of CHAMPS) m[c] += w * sec[c];
+      sec.couches.forEach((v, j) => (m.couches[j] += w * v));
+    }
+  }
+  return m;
 }
 
 export interface VolumeExtrait {
@@ -246,59 +302,64 @@ function extrait(enPlace: number, o: OptionsMateriau): VolumeExtrait {
   };
 }
 
-export function alertesTroncon(t: Troncon, H1: number, H2: number): string[] {
-  const alertes: string[] = [];
-  const Hmin = Math.min(H1, H2);
-  if (t.longueur <= 0) alertes.push('Longueur du tronçon nulle ou négative.');
-  if (t.largeur <= 0) alertes.push('Largeur de tranchée nulle ou négative.');
-  if (Hmin <= 0) alertes.push('Profondeur nulle ou négative à un regard (vérifier TN / fil d’eau).');
-
-  const geoms = geometrieTuyaux(t);
+export function alertesTroncon(t: Troncon, amont: Regard, aval: Regard): string[] {
+  const alertes = new Set<string>();
+  if (t.longueur <= 0) alertes.add('Longueur du tronçon nulle ou négative.');
+  if (t.largeur <= 0) alertes.add('Largeur de tranchée nulle ou négative.');
   const demi = t.largeur / 2;
-  for (const g of geoms) {
-    if (g.bloc.x0 < -demi - 1e-9 || g.bloc.x1 > demi + 1e-9) {
-      alertes.push(`L’enrobage de « ${g.tuyau.nom} » dépasse la largeur en fond de tranchée : il est rogné aux parois.`);
+  const epStructure = t.couches.reduce((s, c) => s + Math.max(0, c.epaisseur), 0);
+
+  // Les positions verticales étant affines le long du tronçon, on contrôle aux deux regards.
+  for (const u of [0, 1] as const) {
+    const regard = u === 0 ? 'amont' : 'aval';
+    const { H, basTuyaux } = etatCoupe(t, amont, aval, u);
+    if (H <= 0) alertes.add(`Profondeur nulle ou négative au regard ${regard} (vérifier TN / fil d’eau).`);
+    const geoms = geometrieTuyaux(t, basTuyaux);
+    for (const g of geoms) {
+      if (g.bloc.x0 < -demi - 1e-9 || g.bloc.x1 > demi + 1e-9) {
+        alertes.add(`L’enrobage de « ${g.tuyau.nom} » dépasse la largeur en fond de tranchée : il est rogné aux parois.`);
+      }
+      if (g.cy + g.r > H + 1e-9) alertes.add(`« ${g.tuyau.nom} » dépasse le terrain naturel au regard ${regard}.`);
     }
-    if (g.cy + g.r > Hmin + 1e-9) {
-      alertes.push(`« ${g.tuyau.nom} » dépasse le terrain naturel à un regard.`);
-    }
-  }
-  for (let i = 0; i < geoms.length; i++) {
-    for (let j = i + 1; j < geoms.length; j++) {
-      const a = geoms[i];
-      const b = geoms[j];
-      if (Math.abs(a.cx - b.cx) < a.r + b.r - 1e-9) {
-        alertes.push(`Les tuyaux « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se chevauchent.`);
-      } else if (a.bloc.x0 < b.bloc.x1 - 1e-9 && b.bloc.x0 < a.bloc.x1 - 1e-9) {
-        alertes.push(
-          `Les enrobages de « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se recouvrent : la partie commune n’est comptée qu’une fois.`,
-        );
+    for (let i = 0; i < geoms.length; i++) {
+      for (let j = i + 1; j < geoms.length; j++) {
+        const a = geoms[i];
+        const b = geoms[j];
+        if (Math.hypot(a.cx - b.cx, a.cy - b.cy) < a.r + b.r - 1e-9) {
+          alertes.add(`Les tuyaux « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se chevauchent au regard ${regard}.`);
+        } else if (
+          a.bloc.x0 < b.bloc.x1 - 1e-9 &&
+          b.bloc.x0 < a.bloc.x1 - 1e-9 &&
+          a.bloc.y0 < b.bloc.y1 - 1e-9 &&
+          b.bloc.y0 < a.bloc.y1 - 1e-9
+        ) {
+          alertes.add(`Les enrobages de « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se recouvrent : la partie commune n’est comptée qu’une fois.`);
+        }
       }
     }
+    const hautEnrobage = geoms.length ? Math.max(...geoms.map((g) => g.bloc.y1)) : 0;
+    if (H > 0 && epStructure > H - hautEnrobage + 1e-9) {
+      alertes.add(`La structure empiète sur l’enrobage au regard ${regard} : les couches sont écrêtées.`);
+    }
+    if (t.decapage.actif && H > 0 && t.decapage.epaisseur > H) {
+      alertes.add(`Le décapage est plus épais que la fouille au regard ${regard}.`);
+    }
   }
-  const epStructure = t.couches.reduce((s, c) => s + Math.max(0, c.epaisseur), 0);
-  const hautEnrobage = geoms.length ? Math.max(...geoms.map((g) => g.bloc.y1)) : 0;
-  if (Hmin > 0 && epStructure > Hmin - hautEnrobage + 1e-9) {
-    alertes.push('La structure empiète sur l’enrobage à un regard : les couches sont écrêtées.');
-  }
-  if (t.decapage.actif && Hmin > 0 && t.decapage.epaisseur > Hmin) {
-    alertes.push('Le décapage est plus épais que la fouille à un regard.');
-  }
-  return alertes;
+  return [...alertes];
 }
 
 export function calculTroncon(p: Projet, index: number): ResultatTroncon {
   const t = p.troncons[index];
   const ra = p.regards[index];
   const rb = p.regards[index + 1];
-  const H1 = profondeur(ra, t);
-  const H2 = profondeur(rb, t);
+  const H1 = profondeur(t, ra, rb, 0);
+  const H2 = profondeur(t, ra, rb, 1);
   const L = Math.max(0, t.longueur);
-  const vol = (g: (s: Section) => number) => L * moyenneLongueur(H1, H2, (H) => g(section(t, H)));
+  const m = moyennesLongueur(t, ra, rb);
 
-  const decapage = vol((s) => s.decapage);
-  const deblai = vol((s) => s.deblai);
-  const remblai = vol((s) => s.remblai);
+  const decapage = L * m.decapage;
+  const deblai = L * m.deblai;
+  const remblai = L * m.remblai;
   const extraitDeblai = extrait(deblai, t.optionsDeblai);
   const extraitDecapage = extrait(decapage, t.optionsDecapage);
   const extraits = [extraitDeblai, extraitDecapage];
@@ -313,22 +374,22 @@ export function calculTroncon(p: Projet, index: number): ResultatTroncon {
     H2,
     type: t.type,
     surface: t.surface,
-    fouille: vol((s) => s.fouille),
+    fouille: L * m.fouille,
     decapage,
     deblai,
-    enrobage: vol((s) => s.enrobage),
-    tuyaux: vol((s) => s.tuyaux),
-    couches: t.couches.map((c, i) => ({ nom: c.nom, volume: vol((s) => s.couches[i]) })),
+    enrobage: L * m.enrobage,
+    tuyaux: L * m.tuyaux,
+    couches: t.couches.map((c, i) => ({ nom: c.nom, volume: L * m.couches[i] })),
     remblai,
-    surfaceTete: vol((s) => s.largeurTete),
-    surfaceBlindage: t.type === 'U' ? 2 * L * ((Math.max(0, H1) + Math.max(0, H2)) / 2) : 0,
+    surfaceTete: L * m.largeurTete,
+    surfaceBlindage: t.type === 'U' ? 2 * L * Math.max(0, m.H) : 0,
     extraitDeblai,
     extraitDecapage,
     reemploi: extraits.filter((e) => e.reutilise).reduce((s, e) => s + e.compte, 0),
     reemploiEnPlace: reemployeEnPlace,
     evacuation: extraits.filter((e) => !e.reutilise).reduce((s, e) => s + e.compte, 0),
     apport: Math.max(0, remblai - reemployeEnPlace),
-    alertes: alertesTroncon(t, H1, H2),
+    alertes: alertesTroncon(t, ra, rb),
   };
 }
 

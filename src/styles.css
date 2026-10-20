@@ -1216,3 +1216,34 @@ th {
   margin: 0;
   flex: 1 1 280px;
 }
+
+.jauge-reseau line {
+  stroke: var(--c-tuyau);
+  stroke-width: 2;
+  stroke-dasharray: 4 2;
+}
+
+.jauge-reseau-texte {
+  font-size: 10px;
+  fill: var(--c-tuyau);
+  font-variant-numeric: tabular-nums;
+}
+
+.fil-d-eau {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--bord);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fil-d-eau .aide {
+  margin: 0;
+}
+
+.valeur-calculee {
+  padding: 0.3rem 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--texte-2);
+}

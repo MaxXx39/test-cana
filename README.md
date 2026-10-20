@@ -35,17 +35,21 @@ Le projet est sauvegardé automatiquement dans le navigateur ; « Enregistrer »
 
 Repère de la coupe : y = 0 au fond de fouille. Toutes les dimensions sont en mètres.
 
-- **Profondeur de fouille** à un regard : `TN − FE + calage`, où le calage est la plus
-  grande valeur `paroi + enrobage bas` parmi les tuyaux du tronçon. Tous les tuyaux d’un
-  tronçon partagent le fil d’eau du projet (les réseaux à profondeurs différentes dans une
-  même tranchée restent un point ouvert du cahier des charges).
+- **Plusieurs réseaux** : chaque tuyau suit le fil d’eau des regards, ou un fil d’eau
+  propre (altitudes amont et aval) pour un réseau posé à une autre profondeur dans la
+  même tranchée (case « Fil d’eau propre » de la fiche du tuyau).
+- **Profondeur de fouille** : le fond, plat sur toute la largeur, est calé sous le réseau
+  le plus profond : `fond = min(FE − paroi − enrobage bas)`, et `H = TN − fond`. Le réseau
+  qui fixe le fond peut changer le long du tronçon ; le calcul est alors découpé au point
+  de bascule.
 - **Tranchée en U** : `largeur × hauteur moyenne × longueur`. Surface de blindage
   calculée sur les deux faces.
 - **Tranchée en V** : la largeur vaut `largeur fond + 2 × fruit × y`. La profondeur variant
   linéairement entre les regards, le volume est intégré exactement :
-  `L × (l·Hm + fruit·(H1² + H1·H2 + H2²)/3)`.
-- **Enrobage** : bloc défini par les quatre épaisseurs autour de chaque tuyau, descendant
-  jusqu’au fond de fouille, moins la section du tuyau. Les blocs sont rognés aux parois de
+  `L × (l·Hm + fruit·(H1² + H1·H2 + H2²)/3)` (sur chaque morceau où H est affine).
+- **Enrobage** : bloc défini par les quatre épaisseurs autour de chaque tuyau, à partir
+  de son propre lit de pose, moins la section du tuyau. Sous un réseau plus haut, l’espace
+  est compté en remblai. Les blocs sont rognés aux parois de
   la tranchée et leurs recouvrements ne sont comptés qu’une fois.
 - **Structure** : les couches s’empilent depuis la surface avec leur épaisseur propre, sur
   la largeur réelle de la tranchée à leur niveau. Elles sont écrêtées si elles atteignent
