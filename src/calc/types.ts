@@ -4,13 +4,20 @@
 export type TrenchType = 'U' | 'V';
 export type SurfaceNature = 'terre' | 'enrobe';
 
+/** Réseau posé dans la tranchée (EU, EP, AEP…). Plusieurs réseaux peuvent cohabiter. */
+export interface Reseau {
+  id: string;
+  nom: string;
+  couleur: string;
+}
+
 export interface Regard {
   id: string;
   nom: string;
   /** Altitude du terrain naturel */
   tn: number;
-  /** Altitude du fil d'eau projet */
-  fe: number;
+  /** Altitude du fil d'eau projet, pour chaque réseau (clé : id du réseau) */
+  fe: Record<string, number>;
 }
 
 export interface Enrobage {
@@ -22,18 +29,14 @@ export interface Enrobage {
 
 export interface Tuyau {
   id: string;
-  nom: string;
+  /** Réseau auquel appartient le tuyau : son fil d'eau est celui du réseau aux regards */
+  reseau: string;
   /** Diamètre extérieur */
   diametre: number;
   /** Épaisseur de paroi : écart entre le fil d'eau (intérieur) et la génératrice inférieure extérieure */
   paroi: number;
   /** Position de l'axe du tuyau par rapport à l'axe de la tranchée (négatif = à gauche) */
   position: number;
-  /**
-   * Fil d'eau propre (altitudes aux regards amont et aval), pour un réseau posé à une
-   * autre profondeur que celui des regards. null : suit le fil d'eau des regards.
-   */
-  filDEau: { amont: number; aval: number } | null;
   enrobage: Enrobage;
 }
 
@@ -74,6 +77,8 @@ export interface Troncon {
 
 export interface Projet {
   nom: string;
+  /** Au moins un réseau */
+  reseaux: Reseau[];
   regards: Regard[];
   /** troncons[i] relie regards[i] à regards[i + 1] */
   troncons: Troncon[];

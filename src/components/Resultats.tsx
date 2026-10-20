@@ -1,4 +1,4 @@
-import type { ResultatGlobal, ResultatTroncon, VolumeExtrait } from '../calc/engine';
+import type { Canalisation, ResultatGlobal, ResultatTroncon, VolumeExtrait } from '../calc/engine';
 import { fmt } from '../utils/format';
 
 const m3 = (v: number) => `${fmt(v, 2)} m³`;
@@ -9,6 +9,25 @@ function destination(e: VolumeExtrait, coef: boolean) {
       {e.reutilise ? 'Réemploi' : 'Évacuation'}
       {coef && e.compte !== e.enPlace ? ` · ${fmt(e.compte, 2)} m³ foisonné` : ''}
     </span>
+  );
+}
+
+function LignesCanalisations({ c, colonnes }: { c: Canalisation[]; colonnes: 2 | 3 }) {
+  return (
+    <>
+      <tr className="groupe">
+        <th colSpan={colonnes}>Canalisations</th>
+      </tr>
+      {c.map((x) => (
+        <tr key={`${x.reseau}-${x.diametre}`}>
+          <td>
+            <span className="pastille-reseau" style={{ background: x.couleur }} aria-hidden="true" /> {x.nom} Ø{fmt(x.diametre * 1000, 0)}
+          </td>
+          <td className="num">{fmt(x.longueur, 2)} m</td>
+          {colonnes === 3 && <td />}
+        </tr>
+      ))}
+    </>
   );
 }
 
@@ -36,6 +55,7 @@ export function DetailTroncon({ r }: { r: ResultatTroncon }) {
       </div>
       <table className="table-detail">
         <tbody>
+          {r.canalisations.length > 0 && <LignesCanalisations c={r.canalisations} colonnes={3} />}
           <tr className="groupe">
             <th colSpan={3}>Extraction</th>
           </tr>
@@ -230,10 +250,11 @@ export function TotalGlobal({ g }: { g: ResultatGlobal }) {
           ))}
           {ligne('Remblai (besoin)', g.remblai)}
           {ligne('dont remblai d’apport', g.apport, 'm³', 'sous-total')}
+          {g.canalisations.length > 0 && <LignesCanalisations c={g.canalisations} colonnes={2} />}
           <tr className="groupe">
             <th colSpan={2}>Divers</th>
           </tr>
-          {ligne('Linéaire', g.longueur, 'm')}
+          {ligne('Linéaire de tranchée', g.longueur, 'm')}
           {ligne('Emprise en tête', g.surfaceTete, 'm²')}
           {g.surfaceBlindage > 0 && ligne('Blindage', g.surfaceBlindage, 'm²')}
           {ligne('Volume occupé par les tuyaux', g.tuyaux)}

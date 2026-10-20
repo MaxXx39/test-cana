@@ -1,12 +1,13 @@
-import type { OptionsMateriau, Projet, Regard, SurfaceNature, Troncon, Tuyau } from './types';
+import type { OptionsMateriau, Projet, Regard, Reseau, SurfaceNature, Troncon, Tuyau } from './types';
 
 /*
  * Repère de la coupe transversale : x horizontal, 0 sur l'axe de la tranchée ;
  * y vertical, 0 au fond de fouille, positif vers le haut. H est la profondeur
  * totale de fouille (du terrain naturel au fond de fouille).
  *
- * Chaque tuyau suit le fil d'eau des regards, ou son propre fil d'eau (réseau
- * posé à une autre profondeur dans la même tranchée). Le fond de fouille, plat
+ * Chaque tuyau appartient à un réseau (EU, EP…) dont le fil d'eau est saisi à
+ * chaque regard : plusieurs réseaux peuvent partager la tranchée à des
+ * profondeurs différentes. Le fond de fouille, plat
  * sur toute la largeur, est calé sous le tuyau le plus exigeant :
  * fond = min(FE − paroi − enrobage bas). Le bloc d'enrobage d'un tuyau part de
  * son propre lit ; sous un réseau plus haut, l'espace est remblayé.
@@ -21,9 +22,23 @@ const SIMPSON_INTERVALLES = 20;
 
 const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
 
+/** Fil d'eau d'un réseau à un regard ; à défaut, le plus profond des fils d'eau saisis */
+export function filDEauRegard(r: Regard, reseau: string): number {
+  const v = r.fe[reseau];
+  if (Number.isFinite(v)) return v;
+  const valeurs = Object.values(r.fe).filter(Number.isFinite);
+  return valeurs.length ? Math.min(...valeurs) : r.tn;
+}
+
 /** Fil d'eau d'un tuyau à l'abscisse relative u */
 export function filDEauTuyau(p: Tuyau, amont: Regard, aval: Regard, u: number): number {
-  return p.filDEau ? lerp(p.filDEau.amont, p.filDEau.aval, u) : lerp(amont.fe, aval.fe, u);
+  return lerp(filDEauRegard(amont, p.reseau), filDEauRegard(aval, p.reseau), u);
+}
+
+/** Libellé d'un tuyau : réseau et diamètre (« EU Ø200 ») */
+export function libelleTuyau(p: Tuyau, reseaux: Reseau[]): string {
+  const r = reseaux.find((x) => x.id === p.reseau);
+  return `${r ? r.nom : 'Tuyau'} Ø${Math.round(p.diametre * 1000)}`;
 }
 
 /** Géométrie verticale d'une coupe : profondeur et hauteur des tuyaux au-dessus du fond */
@@ -35,7 +50,7 @@ export interface EtatCoupe {
 
 export function etatCoupe(t: Troncon, amont: Regard, aval: Regard, u: number): EtatCoupe {
   const tn = lerp(amont.tn, aval.tn, u);
-  if (t.tuyaux.length === 0) return { H: tn - lerp(amont.fe, aval.fe, u), basTuyaux: [] };
+  if (t.tuyaux.length === 0) return { H: tn - lerp(filDEauRegard(amont, ''), filDEauRegard(aval, ''), u), basTuyaux: [] };
   const bas = t.tuyaux.map((p) => filDEauTuyau(p, amont, aval, u) - p.paroi);
   const fond = Math.min(...t.tuyaux.map((p, i) => bas[i] - p.enrobage.bas));
   return { H: tn - fond, basTuyaux: bas.map((b) => b - fond) };
@@ -291,7 +306,17 @@ export interface ResultatTroncon {
   evacuation: number;
   /** Remblai à fournir : besoin en remblai moins le réemploi (volumes en place) */
   apport: number;
+  canalisations: Canalisation[];
   alertes: string[];
+}
+
+/** Linéaire de canalisation d'un réseau pour un diamètre */
+export interface Canalisation {
+  reseau: string;
+  nom: string;
+  couleur: string;
+  diametre: number;
+  longueur: number;
 }
 
 function extrait(enPlace: number, o: OptionsMateriau): VolumeExtrait {
@@ -302,7 +327,12 @@ function extrait(enPlace: number, o: OptionsMateriau): VolumeExtrait {
   };
 }
 
-export function alertesTroncon(t: Troncon, amont: Regard, aval: Regard): string[] {
+export function alertesTroncon(
+  t: Troncon,
+  amont: Regard,
+  aval: Regard,
+  nom: (p: Tuyau) => string = (p) => `Ø${Math.round(p.diametre * 1000)}`,
+): string[] {
   const alertes = new Set<string>();
   if (t.longueur <= 0) alertes.add('Longueur du tronçon nulle ou négative.');
   if (t.largeur <= 0) alertes.add('Largeur de tranchée nulle ou négative.');
@@ -317,23 +347,23 @@ export function alertesTroncon(t: Troncon, amont: Regard, aval: Regard): string[
     const geoms = geometrieTuyaux(t, basTuyaux);
     for (const g of geoms) {
       if (g.bloc.x0 < -demi - 1e-9 || g.bloc.x1 > demi + 1e-9) {
-        alertes.add(`L’enrobage de « ${g.tuyau.nom} » dépasse la largeur en fond de tranchée : il est rogné aux parois.`);
+        alertes.add(`L’enrobage de « ${nom(g.tuyau)} » dépasse la largeur en fond de tranchée : il est rogné aux parois.`);
       }
-      if (g.cy + g.r > H + 1e-9) alertes.add(`« ${g.tuyau.nom} » dépasse le terrain naturel au regard ${regard}.`);
+      if (g.cy + g.r > H + 1e-9) alertes.add(`« ${nom(g.tuyau)} » dépasse le terrain naturel au regard ${regard}.`);
     }
     for (let i = 0; i < geoms.length; i++) {
       for (let j = i + 1; j < geoms.length; j++) {
         const a = geoms[i];
         const b = geoms[j];
         if (Math.hypot(a.cx - b.cx, a.cy - b.cy) < a.r + b.r - 1e-9) {
-          alertes.add(`Les tuyaux « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se chevauchent au regard ${regard}.`);
+          alertes.add(`Les tuyaux « ${nom(a.tuyau)} » et « ${nom(b.tuyau)} » se chevauchent au regard ${regard}.`);
         } else if (
           a.bloc.x0 < b.bloc.x1 - 1e-9 &&
           b.bloc.x0 < a.bloc.x1 - 1e-9 &&
           a.bloc.y0 < b.bloc.y1 - 1e-9 &&
           b.bloc.y0 < a.bloc.y1 - 1e-9
         ) {
-          alertes.add(`Les enrobages de « ${a.tuyau.nom} » et « ${b.tuyau.nom} » se recouvrent : la partie commune n’est comptée qu’une fois.`);
+          alertes.add(`Les enrobages de « ${nom(a.tuyau)} » et « ${nom(b.tuyau)} » se recouvrent : la partie commune n’est comptée qu’une fois.`);
         }
       }
     }
@@ -389,7 +419,11 @@ export function calculTroncon(p: Projet, index: number): ResultatTroncon {
     reemploiEnPlace: reemployeEnPlace,
     evacuation: extraits.filter((e) => !e.reutilise).reduce((s, e) => s + e.compte, 0),
     apport: Math.max(0, remblai - reemployeEnPlace),
-    alertes: alertesTroncon(t, ra, rb),
+    canalisations: t.tuyaux.map((x) => {
+      const r = p.reseaux.find((y) => y.id === x.reseau);
+      return { reseau: x.reseau, nom: r?.nom ?? '?', couleur: r?.couleur ?? '#888', diametre: x.diametre, longueur: L };
+    }),
+    alertes: alertesTroncon(t, ra, rb, (x) => libelleTuyau(x, p.reseaux)),
   };
 }
 
@@ -407,6 +441,8 @@ export interface ResultatGlobal {
   surfaceBlindage: number;
   reemploi: number;
   evacuation: number;
+  /** Linéaire par réseau et diamètre */
+  canalisations: Canalisation[];
   /** Remblai à fournir à l'échelle du chantier (les excédents d'un tronçon compensent les autres) */
   apport: number;
 }
@@ -422,7 +458,16 @@ export function calculGlobal(resultats: ResultatTroncon[]): ResultatGlobal {
       else couches.set(cle, { nom: c.nom.trim(), volume: c.volume });
     }
   }
+  const canalisations: Canalisation[] = [];
+  for (const r of resultats) {
+    for (const c of r.canalisations) {
+      const cur = canalisations.find((x) => x.reseau === c.reseau && Math.abs(x.diametre - c.diametre) < 1e-9);
+      if (cur) cur.longueur += c.longueur;
+      else canalisations.push({ ...c });
+    }
+  }
   return {
+    canalisations,
     longueur: somme((r) => r.longueur),
     fouille: somme((r) => r.fouille),
     decapageTerre: somme((r) => (r.surface === 'terre' ? r.decapage : 0)),

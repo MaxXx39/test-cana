@@ -1,5 +1,6 @@
-import type { Projet, Regard } from '../calc/types';
+import type { Projet, Regard, Reseau } from '../calc/types';
 import type { ResultatTroncon } from '../calc/engine';
+import { COULEURS_RESEAUX } from '../calc/projet';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -12,48 +13,129 @@ interface Props {
   onLongueur: (index: number, longueur: number) => void;
   onInserer: (index: number) => void;
   onSupprimer: (index: number) => void;
+  onReseau: (r: Reseau) => void;
+  onAjouterReseau: () => void;
+  onSupprimerReseau: (r: Reseau) => void;
 }
 
-/** Saisie du tracé : regards dans l'ordre, tronçons intercalés */
-export function Trace({ projet, resultats, actif, onSelect, onRegard, onLongueur, onInserer, onSupprimer }: Props) {
+export function PastilleReseau({ couleur }: { couleur: string }) {
+  return <span className="pastille-reseau" style={{ background: couleur }} aria-hidden="true" />;
+}
+
+/** Saisie du tracé : réseaux, puis regards dans l'ordre avec les tronçons intercalés */
+export function Trace({ projet, resultats, actif, onSelect, onRegard, onLongueur, onInserer, onSupprimer, onReseau, onAjouterReseau, onSupprimerReseau }: Props) {
+  const { reseaux, regards, troncons } = projet;
+  const utilise = (id: string, ...indices: number[]) => indices.some((i) => troncons[i]?.tuyaux.some((p) => p.reseau === id));
+
   return (
     <div className="trace">
-      <div className="trace-entete">
-        <span>Regard</span>
-        <span>TN</span>
-        <span>FE</span>
-        <span className="num">Prof.</span>
-        <span />
-      </div>
-      {projet.regards.map((r, i) => {
-        const t = projet.troncons[i];
+      <section className="reseaux">
+        <div className="titre-actions">
+          <h3>Réseaux</h3>
+          <button type="button" className="btn btn-ajout btn-petit" onClick={onAjouterReseau}>
+            + Réseau
+          </button>
+        </div>
+        {reseaux.map((r) => (
+          <div key={r.id} className="reseau-ligne">
+            <button
+              type="button"
+              className="pastille-bouton"
+              style={{ background: r.couleur }}
+              title="Changer la couleur"
+              aria-label={`Changer la couleur du réseau ${r.nom}`}
+              onClick={() => onReseau({ ...r, couleur: COULEURS_RESEAUX[(COULEURS_RESEAUX.indexOf(r.couleur) + 1) % COULEURS_RESEAUX.length] })}
+            />
+            <input
+              className="input-nom"
+              value={r.nom}
+              onChange={(e) => onReseau({ ...r, nom: e.target.value })}
+              aria-label="Nom du réseau"
+              list="noms-reseaux"
+            />
+            <span className="reseau-usage">
+              {troncons.filter((t) => t.tuyaux.some((p) => p.reseau === r.id)).length} / {troncons.length} tronçons
+            </span>
+            <button
+              type="button"
+              className="btn-icone"
+              disabled={reseaux.length <= 1}
+              onClick={() => onSupprimerReseau(r)}
+              title="Supprimer ce réseau"
+              aria-label={`Supprimer le réseau ${r.nom}`}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <datalist id="noms-reseaux">
+          {['EU', 'EP', 'UN', 'AEP', 'Drainage'].map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      </section>
+
+      <h3 className="trace-titre">Regards et tronçons</h3>
+      <p className="aide">Altitudes en m NGF, dans l’ordre du tracé. Un fil d’eau par réseau.</p>
+      {regards.map((r, i) => {
+        const t = troncons[i];
         const res = resultats[i];
         return (
           <div key={r.id}>
-            <div className="regard-ligne">
-              <input className="input-nom" value={r.nom} onChange={(e) => onRegard(i, { ...r, nom: e.target.value })} aria-label="Nom du regard" />
-              <NumberField value={r.tn} onChange={(v) => onRegard(i, { ...r, tn: v })} decimales={2} pas={0.01} title="Altitude du terrain naturel (m)" />
-              <NumberField value={r.fe} onChange={(v) => onRegard(i, { ...r, fe: v })} decimales={2} pas={0.01} title="Altitude du fil d’eau projet (m)" />
-              <span className={`num prof ${r.tn - r.fe <= 0 ? 'alerte-texte' : ''}`}>{fmt(r.tn - r.fe, 2)}</span>
-              <button
-                type="button"
-                className="btn-icone"
-                disabled={projet.regards.length <= 2}
-                onClick={() => onSupprimer(i)}
-                title="Supprimer ce regard"
-                aria-label={`Supprimer le regard ${r.nom}`}
-              >
-                ×
-              </button>
+            <div className="regard-carte">
+              <div className="regard-tete">
+                <input className="input-nom input-regard" value={r.nom} onChange={(e) => onRegard(i, { ...r, nom: e.target.value })} aria-label="Nom du regard" />
+                <span className="regard-lib">TN</span>
+                <NumberField value={r.tn} onChange={(v) => onRegard(i, { ...r, tn: v })} decimales={2} pas={0.01} title="Altitude du terrain naturel (m)" />
+                <button
+                  type="button"
+                  className="btn-icone"
+                  disabled={regards.length <= 2}
+                  onClick={() => onSupprimer(i)}
+                  title="Supprimer ce regard"
+                  aria-label={`Supprimer le regard ${r.nom}`}
+                >
+                  ×
+                </button>
+              </div>
+              {reseaux.map((x) => {
+                const fe = r.fe[x.id];
+                const prof = r.tn - fe;
+                return (
+                  <div key={x.id} className={`regard-fe ${utilise(x.id, i - 1, i) ? '' : 'regard-fe-inutile'}`}>
+                    <PastilleReseau couleur={x.couleur} />
+                    <span className="regard-fe-nom">FE {x.nom}</span>
+                    <NumberField
+                      value={fe}
+                      onChange={(v) => onRegard(i, { ...r, fe: { ...r.fe, [x.id]: v } })}
+                      decimales={2}
+                      pas={0.01}
+                      title={`Fil d’eau ${x.nom} (m)`}
+                    />
+                    <span className={`num prof ${prof <= 0 ? 'alerte-texte' : ''}`} title="Profondeur TN − FE">
+                      {fmt(prof, 2)} m
+                    </span>
+                  </div>
+                );
+              })}
             </div>
             {t && (
               <div className={`troncon-ligne ${i === actif ? 'troncon-actif' : ''}`}>
                 <button type="button" className="troncon-select" onClick={() => onSelect(i)} aria-pressed={i === actif}>
                   <span className="troncon-titre">
-                    Tronçon {i + 1} · {t.type === 'U' ? 'U' : 'V'} {fmt(t.largeur, 2)} m
+                    Tronçon {i + 1}
+                    <span className="troncon-reseaux">
+                      {reseaux
+                        .filter((x) => t.tuyaux.some((p) => p.reseau === x.id))
+                        .map((x) => (
+                          <span key={x.id} className="puce-reseau" style={{ borderColor: x.couleur, color: x.couleur }}>
+                            {x.nom}
+                          </span>
+                        ))}
+                    </span>
                   </span>
                   <span className="troncon-sous">
-                    {res ? `${fmt(res.fouille, 1)} m³ de fouille` : ''}
+                    {t.type} {fmt(t.largeur, 2)} m{res ? ` · ${fmt(res.fouille, 1)} m³` : ''}
                     {res && res.alertes.length > 0 && <span className="badge-alerte"> · ⚠ {res.alertes.length}</span>}
                   </span>
                 </button>
@@ -66,7 +148,7 @@ export function Trace({ projet, resultats, actif, onSelect, onRegard, onLongueur
           </div>
         );
       })}
-      <button type="button" className="btn btn-ajout btn-plein" onClick={() => onInserer(projet.regards.length)}>
+      <button type="button" className="btn btn-ajout btn-plein" onClick={() => onInserer(regards.length)}>
         + Regard en fin de tracé
       </button>
     </div>

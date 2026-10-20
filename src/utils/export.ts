@@ -21,6 +21,7 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
       'Amont',
       'Aval',
       'Type',
+      'Réseaux',
       'Longueur (m)',
       'H amont (m)',
       'H aval (m)',
@@ -51,6 +52,7 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
         txt(r.amont),
         txt(r.aval),
         r.type,
+        txt(r.canalisations.map((c) => `${c.nom} Ø${Math.round(c.diametre * 1000)}`).join(' + ')),
         nb(r.longueur),
         nb(r.H1),
         nb(r.H2),
@@ -76,7 +78,8 @@ export function exportCsv(nomProjet: string, resultats: ResultatTroncon[], g: Re
   lignes.push('');
   lignes.push('Total global');
   const total: [string, number, string][] = [
-    ['Linéaire', g.longueur, 'm'],
+    ['Linéaire de tranchée', g.longueur, 'm'],
+    ...g.canalisations.map((c): [string, number, string] => [`Canalisation ${c.nom} Ø${Math.round(c.diametre * 1000)}`, c.longueur, 'm']),
     ['Fouille totale', g.fouille, 'm³'],
     ['Décapage enrobé', g.decapageEnrobe, 'm³'],
     ['Décapage terre', g.decapageTerre, 'm³'],

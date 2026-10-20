@@ -16,15 +16,18 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 
 ## Utilisation
 
-1. **Tracé** (colonne de gauche) : saisir les regards dans l’ordre (nom, altitude TN,
-   altitude fil d’eau) et la longueur de chaque tronçon. Le bouton `+` d’un tronçon y
+1. **Réseaux** (haut de la colonne de gauche) : déclarer les réseaux qui partagent la
+   tranchée (EU, EP…), chacun avec sa couleur.
+2. **Tracé** : saisir les regards dans l’ordre (nom, altitude TN, puis un fil d’eau par
+   réseau) et la longueur de chaque tronçon. Le bouton `+` d’un tronçon y
    insère un regard intermédiaire (le tronçon est coupé en deux).
-2. **Tronçon** : cliquer un tronçon pour l’éditer. La coupe transversale est dessinée à
-   l’échelle, avec le regard amont à gauche et le regard aval à droite. Les poignées
+3. **Tronçon** : cliquer un tronçon pour l’éditer et y poser un ou plusieurs tuyaux, chacun
+   rattaché à un réseau. La coupe transversale est dessinée à l’échelle, avec le regard
+   amont à gauche et le regard aval à droite (un puits par réseau, à son fil d’eau). Les poignées
    orange se glissent pour régler la largeur, la pente de talus, le décapage, l’épaisseur
    des couches ; cliquer un tuyau pour le déplacer et ajuster son enrobage. Le sélecteur
    Amont / Milieu / Aval choisit la profondeur de la coupe affichée.
-3. **Résultats** : volumes du tronçon à côté du formulaire, tableau de tous les tronçons
+4. **Résultats** : volumes du tronçon à côté du formulaire, tableau de tous les tronçons
    et total global en bas de page. Export CSV (séparateur `;`, virgule décimale) et
    impression.
 
@@ -35,9 +38,9 @@ Le projet est sauvegardé automatiquement dans le navigateur ; « Enregistrer »
 
 Repère de la coupe : y = 0 au fond de fouille. Toutes les dimensions sont en mètres.
 
-- **Plusieurs réseaux** : chaque tuyau suit le fil d’eau des regards, ou un fil d’eau
-  propre (altitudes amont et aval) pour un réseau posé à une autre profondeur dans la
-  même tranchée (case « Fil d’eau propre » de la fiche du tuyau).
+- **Plusieurs réseaux** : chaque tuyau appartient à un réseau, dont le fil d’eau est saisi
+  à chaque regard. Les réseaux d’une même tranchée peuvent donc être à des profondeurs
+  différentes. Les résultats donnent le linéaire de canalisation par réseau et diamètre.
 - **Profondeur de fouille** : le fond, plat sur toute la largeur, est calé sous le réseau
   le plus profond : `fond = min(FE − paroi − enrobage bas)`, et `H = TN − fond`. Le réseau
   qui fixe le fond peut changer le long du tronçon ; le calcul est alors découpé au point

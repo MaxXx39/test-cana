@@ -1,6 +1,6 @@
-import type { Couche, OptionsMateriau, Regard, Troncon, Tuyau } from '../calc/types';
-import { nouveauTuyau, nouvelleCouche } from '../calc/projet';
-import { profondeur } from '../calc/engine';
+import type { Couche, OptionsMateriau, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
+import { nouveauTuyau, nouvelleCouche, repartirTuyaux } from '../calc/projet';
+import { filDEauRegard, profondeur } from '../calc/engine';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
 
@@ -8,6 +8,7 @@ interface Props {
   troncon: Troncon;
   amont: Regard;
   aval: Regard;
+  reseaux: Reseau[];
   onChange: (t: Troncon) => void;
   selection: string | null;
   onSelect: (id: string | null) => void;
@@ -53,46 +54,9 @@ function OptionsExtrait({ titre, options, onChange }: { titre: string; options: 
   );
 }
 
-/** Fil d'eau du tuyau : celui des regards, ou un fil d'eau propre pour un réseau à une autre profondeur */
-function FilDEau({
-  tuyau: p,
-  amont,
-  aval,
-  onChange,
-}: {
-  tuyau: Tuyau;
-  amont: Regard;
-  aval: Regard;
-  onChange: (fe: Tuyau['filDEau']) => void;
-}) {
-  const fe = p.filDEau;
-  return (
-    <div className="fil-d-eau">
-      <label className="case">
-        <input type="checkbox" checked={fe !== null} onChange={(e) => onChange(e.target.checked ? { amont: amont.fe, aval: aval.fe } : null)} />
-        Fil d’eau propre (réseau à une autre profondeur)
-      </label>
-      {fe ? (
-        <div className="grille-champs grille-serree">
-          <NumberField label={`FE amont (${amont.nom})`} value={fe.amont} onChange={(v) => onChange({ ...fe, amont: v })} decimales={2} pas={0.01} unite="m" />
-          <NumberField label={`FE aval (${aval.nom})`} value={fe.aval} onChange={(v) => onChange({ ...fe, aval: v })} decimales={2} pas={0.01} unite="m" />
-          <div className="champ">
-            <span className="champ-label">Prof. sous TN</span>
-            <span className="valeur-calculee">
-              {fmt(amont.tn - fe.amont, 2)} → {fmt(aval.tn - fe.aval, 2)} m
-            </span>
-          </div>
-        </div>
-      ) : (
-        <p className="aide">
-          Suit le fil d’eau des regards : {fmt(amont.fe, 2)} → {fmt(aval.fe, 2)}.
-        </p>
-      )}
-    </div>
-  );
-}
+const cm = (m: number) => fmt(m * 100, 0);
 
-export function TronconEditor({ troncon: t, amont, aval, onChange, selection, onSelect }: Props) {
+export function TronconEditor({ troncon: t, amont, aval, reseaux, onChange, selection, onSelect }: Props) {
   const maj = (partiel: Partial<Troncon>) => onChange({ ...t, ...partiel });
   const majTuyau = (id: string, partiel: Partial<Tuyau>) =>
     maj({ tuyaux: t.tuyaux.map((p) => (p.id === id ? { ...p, ...partiel } : p)) });
@@ -107,32 +71,26 @@ export function TronconEditor({ troncon: t, amont, aval, onChange, selection, on
     maj({ couches });
   };
 
-  /** Place les tuyaux côte à côte (enrobages jointifs), le groupe étant centré ; élargit la tranchée si besoin */
+  /** Place les tuyaux côte à côte, centrés ; élargit la tranchée si besoin */
   const repartir = (tuyaux: Tuyau[]) => {
-    const largeurs = tuyaux.map((p) => p.enrobage.gauche + p.diametre + p.enrobage.droite);
-    const total = largeurs.reduce((a, b) => a + b, 0);
-    let x = -total / 2;
-    const places = tuyaux.map((p, i) => {
-      const position = x + p.enrobage.gauche + p.diametre / 2;
-      x += largeurs[i];
-      return { ...p, position: Math.round(position * 1000) / 1000 };
-    });
-    maj({ tuyaux: places, largeur: Math.max(t.largeur, Math.ceil(total * 100 - 1e-6) / 100) });
+    const r = repartirTuyaux(tuyaux);
+    maj({ tuyaux: r.tuyaux, largeur: Math.max(t.largeur, r.largeur) });
   };
 
+  /** Ajoute un tuyau, de préférence sur un réseau pas encore posé dans ce tronçon */
   const ajouterTuyau = () => {
-    const dernier = t.tuyaux[t.tuyaux.length - 1];
-    const p = nouveauTuyau(`Tuyau ${t.tuyaux.length + 1}`);
-    if (dernier) {
-      p.diametre = dernier.diametre;
-      p.paroi = dernier.paroi;
-      p.enrobage = { ...dernier.enrobage };
-      repartir([...t.tuyaux, p]);
-    } else {
-      maj({ tuyaux: [p] });
+    const libre = reseaux.find((r) => !t.tuyaux.some((p) => p.reseau === r.id)) ?? reseaux[0];
+    const modele = t.tuyaux[t.tuyaux.length - 1];
+    const p = nouveauTuyau(libre.id, modele?.diametre ?? 0.315);
+    if (modele) {
+      p.paroi = modele.paroi;
+      p.enrobage = { ...modele.enrobage };
     }
+    repartir([...t.tuyaux, p]);
     onSelect(p.id);
   };
+
+  const enrobageATous = (e: Tuyau['enrobage']) => maj({ tuyaux: t.tuyaux.map((p) => ({ ...p, enrobage: { ...e } })) });
 
   return (
     <div className="editeur">
@@ -207,55 +165,96 @@ export function TronconEditor({ troncon: t, amont, aval, onChange, selection, on
           <h3>Tuyaux et enrobage</h3>
           <div className="actions">
             {t.tuyaux.length > 1 && (
-              <button type="button" className="btn btn-leger" onClick={() => repartir(t.tuyaux)} title="Placer les tuyaux côte à côte, centrés (élargit la tranchée si nécessaire)">
-                Répartir
+              <button type="button" className="btn btn-leger btn-petit" onClick={() => repartir(t.tuyaux)} title="Placer les tuyaux côte à côte, centrés (élargit la tranchée si nécessaire)">
+                Répartir côte à côte
               </button>
             )}
-            <button type="button" className="btn btn-ajout" onClick={ajouterTuyau}>
+            <button type="button" className="btn btn-ajout btn-petit" onClick={ajouterTuyau}>
               + Tuyau
             </button>
           </div>
         </div>
         {t.tuyaux.length === 0 && <p className="aide">Aucun tuyau : la fouille est entièrement remblayée.</p>}
-        {t.tuyaux.map((p) => (
-          <div
-            key={p.id}
-            className={`carte-tuyau ${p.id === selection ? 'carte-sel' : ''}`}
-            onFocusCapture={() => onSelect(p.id)}
-            onClick={() => onSelect(p.id)}
-          >
-            <div className="carte-entete">
-              <input className="input-nom" value={p.nom} onChange={(e) => majTuyau(p.id, { nom: e.target.value })} aria-label="Nom du tuyau" />
-              <button
-                type="button"
-                className="btn-icone"
-                title="Supprimer ce tuyau"
-                aria-label={`Supprimer ${p.nom}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  maj({ tuyaux: t.tuyaux.filter((q) => q.id !== p.id) });
-                }}
+        <div className="liste-tuyaux">
+          {t.tuyaux.map((p) => {
+            const res = reseaux.find((r) => r.id === p.reseau);
+            const sel = p.id === selection;
+            const feA = filDEauRegard(amont, p.reseau);
+            const feB = filDEauRegard(aval, p.reseau);
+            return (
+              <div
+                key={p.id}
+                className={`carte-tuyau ${sel ? 'carte-sel' : ''}`}
+                style={{ borderLeftColor: res?.couleur }}
+                onClick={() => onSelect(p.id)}
+                onFocusCapture={() => onSelect(p.id)}
               >
-                ×
-              </button>
-            </div>
-            <div className="grille-champs grille-serree">
-              <NumberField label="Ø extérieur" value={p.diametre} onChange={(v) => majTuyau(p.id, { diametre: v })} echelle={1000} decimales={0} unite="mm" min={10} pas={10} />
-              <NumberField label="Paroi" value={p.paroi} onChange={(v) => majTuyau(p.id, { paroi: v })} echelle={1000} decimales={0} unite="mm" min={0} pas={1} title="Écart entre fil d’eau et génératrice inférieure extérieure" />
-              <NumberField label="Position / axe" value={p.position} onChange={(v) => majTuyau(p.id, { position: v })} unite="m" pas={0.05} title="Décalage de l’axe du tuyau par rapport à l’axe de la tranchée (négatif = à gauche)" />
-            </div>
-            <FilDEau tuyau={p} amont={amont} aval={aval} onChange={(filDEau) => majTuyau(p.id, { filDEau })} />
-            <div className="enrobage-croix">
-              <NumberField label="Haut" value={p.enrobage.haut} onChange={(v) => majEnrobage(p, 'haut', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-              <NumberField label="Gauche" value={p.enrobage.gauche} onChange={(v) => majEnrobage(p, 'gauche', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-              <span className="enrobage-centre" aria-hidden="true">
-                Ø
-              </span>
-              <NumberField label="Droite" value={p.enrobage.droite} onChange={(v) => majEnrobage(p, 'droite', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-              <NumberField label="Bas (lit)" value={p.enrobage.bas} onChange={(v) => majEnrobage(p, 'bas', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
-            </div>
-          </div>
-        ))}
+                <div className="tuyau-ligne">
+                  <select
+                    className="select-reseau"
+                    value={p.reseau}
+                    onChange={(e) => majTuyau(p.id, { reseau: e.target.value })}
+                    aria-label="Réseau"
+                    style={{ color: res?.couleur }}
+                  >
+                    {reseaux.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nom}
+                      </option>
+                    ))}
+                  </select>
+                  <NumberField value={p.diametre} onChange={(v) => majTuyau(p.id, { diametre: v })} echelle={1000} decimales={0} unite="mm" min={10} pas={10} title="Diamètre extérieur" />
+                  <NumberField value={p.position} onChange={(v) => majTuyau(p.id, { position: v })} unite="m" pas={0.05} title="Position de l’axe du tuyau par rapport à l’axe de la tranchée (négatif = à gauche)" />
+                  <button
+                    type="button"
+                    className="btn-icone"
+                    title="Supprimer ce tuyau"
+                    aria-label={`Supprimer le tuyau ${res?.nom ?? ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      maj({ tuyaux: t.tuyaux.filter((q) => q.id !== p.id) });
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="tuyau-resume">
+                  FE {fmt(feA, 2)} → {fmt(feB, 2)} · prof. {fmt(amont.tn - feA, 2)} → {fmt(aval.tn - feB, 2)} m
+                  {!sel && (
+                    <>
+                      {' '}
+                      · enrobage {cm(p.enrobage.bas)}/{cm(p.enrobage.gauche)}/{cm(p.enrobage.droite)}/{cm(p.enrobage.haut)} cm
+                    </>
+                  )}
+                </div>
+                {sel && (
+                  <div className="tuyau-detail">
+                    <div className="enrobage-croix">
+                      <NumberField label="Haut" value={p.enrobage.haut} onChange={(v) => majEnrobage(p, 'haut', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
+                      <NumberField label="Gauche" value={p.enrobage.gauche} onChange={(v) => majEnrobage(p, 'gauche', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
+                      <span className="enrobage-centre" style={{ borderColor: res?.couleur, color: res?.couleur }} aria-hidden="true">
+                        {res?.nom}
+                      </span>
+                      <NumberField label="Droite" value={p.enrobage.droite} onChange={(v) => majEnrobage(p, 'droite', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
+                      <NumberField label="Bas (lit)" value={p.enrobage.bas} onChange={(v) => majEnrobage(p, 'bas', v)} echelle={100} decimales={0} unite="cm" min={0} pas={1} />
+                    </div>
+                    <div className="tuyau-pied">
+                      <NumberField label="Paroi" value={p.paroi} onChange={(v) => majTuyau(p.id, { paroi: v })} echelle={1000} decimales={0} unite="mm" min={0} pas={1} title="Écart entre fil d’eau et génératrice inférieure extérieure" />
+                      {t.tuyaux.length > 1 && (
+                        <button type="button" className="btn btn-leger btn-petit" onClick={() => enrobageATous(p.enrobage)}>
+                          Même enrobage pour tous
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {t.tuyaux.length > 0 && (
+          <p className="aide">Cliquez un tuyau (ici ou sur la coupe) pour régler son enrobage. Le fil d’eau de chaque réseau se saisit aux regards.</p>
+        )}
       </section>
 
       <section className="bloc-form">

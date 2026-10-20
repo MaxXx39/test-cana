@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, section } from './engine';
-import { insererRegard, normaliserProjet, nouveauRegard, nouveauTroncon, projetExemple, supprimerRegard } from './projet';
-import type { Projet, Troncon } from './types';
+import {
+  ajouterReseau,
+  insererRegard,
+  normaliserProjet,
+  nouveauRegard,
+  nouveauTroncon,
+  projetExemple,
+  supprimerRegard,
+  supprimerReseau,
+} from './projet';
+import type { Projet, Troncon, Tuyau } from './types';
+
+const EU = 'eu';
+const EP = 'ep';
 
 function tronconNu(partiel: Partial<Troncon> = {}): Troncon {
   return {
-    ...nouveauTroncon(10),
+    ...nouveauTroncon(10, EU),
     largeur: 1,
     tuyaux: [],
     couches: [],
@@ -16,9 +28,27 @@ function tronconNu(partiel: Partial<Troncon> = {}): Troncon {
   };
 }
 
-function projet(t: Troncon, H1: number, H2: number): Projet {
-  return { nom: 't', regards: [nouveauRegard('A', 100 + H1, 100), nouveauRegard('B', 100 + H2, 100)], troncons: [t] };
+/** TN = 100 + H, fil d'eau EU à 100, fil d'eau EP donné (amont, aval) */
+function projet(t: Troncon, H1: number, H2: number, ep: [number, number] = [100, 100]): Projet {
+  return {
+    nom: 't',
+    reseaux: [
+      { id: EU, nom: 'EU', couleur: '#000' },
+      { id: EP, nom: 'EP', couleur: '#00f' },
+    ],
+    regards: [nouveauRegard('A', 100 + H1, { [EU]: 100, [EP]: ep[0] }), nouveauRegard('B', 100 + H2, { [EU]: 100, [EP]: ep[1] })],
+    troncons: [t],
+  };
 }
+
+const tuyau: Tuyau = {
+  id: 'p',
+  reseau: EU,
+  diametre: 0.4,
+  paroi: 0,
+  position: 0,
+  enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
+};
 
 describe('volumes de fouille', () => {
   it('tranchée en U : hauteur moyenne × largeur × longueur', () => {
@@ -40,26 +70,16 @@ describe('volumes de fouille', () => {
   it('la profondeur intègre le calage sous fil d’eau du tuyau le plus exigeant', () => {
     const t = tronconNu({
       tuyaux: [
-        { ...nouveauTroncon().tuyaux[0], paroi: 0.03, enrobage: { bas: 0.1, haut: 0.1, gauche: 0.1, droite: 0.1 } },
-        { ...nouveauTroncon().tuyaux[0], paroi: 0, position: 1, enrobage: { bas: 0.15, haut: 0.1, gauche: 0.1, droite: 0.1 } },
+        { ...tuyau, paroi: 0.03, enrobage: { bas: 0.1, haut: 0.1, gauche: 0.1, droite: 0.1 } },
+        { ...tuyau, id: 'q', position: 1, enrobage: { bas: 0.15, haut: 0.1, gauche: 0.1, droite: 0.1 } },
       ],
     });
-    const r = nouveauRegard('A', 102, 100);
-    expect(profondeur(t, r, r, 0)).toBeCloseTo(2.15, 9);
+    const p = projet(t, 2, 2);
+    expect(profondeur(t, p.regards[0], p.regards[1], 0)).toBeCloseTo(2.15, 9);
   });
 });
 
 describe('enrobage', () => {
-  const tuyau = {
-    id: 'p',
-    nom: 'P',
-    diametre: 0.4,
-    paroi: 0,
-    position: 0,
-    filDEau: null,
-    enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
-  };
-
   it('bloc moins cylindre', () => {
     const s = section(tronconNu({ largeur: 0.8, tuyaux: [tuyau] }), 2);
     const tuyauAire = Math.PI * 0.04;
@@ -94,23 +114,13 @@ describe('enrobage', () => {
   });
 });
 
-describe('réseaux à des profondeurs différentes', () => {
-  const base = {
-    id: 'a',
-    nom: 'EU',
-    diametre: 0.4,
-    paroi: 0,
-    position: -0.5,
-    filDEau: null,
-    enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
-  };
+describe('plusieurs réseaux dans la tranchée', () => {
+  const eu = { ...tuyau, position: -0.5 };
+  const ep = { ...tuyau, id: 'b', reseau: EP, position: 0.5 };
 
   it('le fond suit le réseau le plus profond, l’enrobage du réseau haut part de son lit', () => {
-    const t = tronconNu({
-      largeur: 2,
-      tuyaux: [base, { ...base, id: 'b', nom: 'EP', position: 0.5, filDEau: { amont: 100.5, aval: 100.5 } }],
-    });
-    const p = projet(t, 2, 2); // TN 102, FE des regards 100
+    const t = tronconNu({ largeur: 2, tuyaux: [eu, ep] });
+    const p = projet(t, 2, 2, [100.5, 100.5]); // TN 102, EU 100, EP 100,5
     const e = etatCoupe(t, p.regards[0], p.regards[1], 0);
     expect(e.H).toBeCloseTo(2.1, 9);
     expect(e.basTuyaux[0]).toBeCloseTo(0.1, 9);
@@ -119,26 +129,24 @@ describe('réseaux à des profondeurs différentes', () => {
     // blocs [-0.9,-0.1]×[0,0.7] et [0.1,0.9]×[0.5,1.2]
     expect(r.enrobage).toBeCloseTo(10 * (2 * 0.8 * 0.7 - 2 * Math.PI * 0.04), 9);
     expect(r.remblai).toBeCloseTo(10 * (2 * 2.1 - 2 * 0.8 * 0.7), 9);
+    expect(r.canalisations.map((c) => [c.nom, c.longueur])).toEqual([
+      ['EU', 10],
+      ['EP', 10],
+    ]);
   });
 
   it('réseaux superposés : la réunion des enrobages est comptée une fois', () => {
-    const t = tronconNu({
-      largeur: 1,
-      tuyaux: [{ ...base, position: 0 }, { ...base, id: 'b', position: 0, filDEau: { amont: 100.6, aval: 100.6 } }],
-    });
-    const r = calculTroncon(projet(t, 2, 2), 0);
+    const t = tronconNu({ largeur: 1, tuyaux: [{ ...eu, position: 0 }, { ...ep, position: 0 }] });
+    const r = calculTroncon(projet(t, 2, 2, [100.6, 100.6]), 0);
     // blocs [−0.4,0.4]×[0,0.7] et [−0.4,0.4]×[0.6,1.3] → réunion 0.8 × 1.3
     expect(r.enrobage).toBeCloseTo(10 * (0.8 * 1.3 - 2 * Math.PI * 0.04), 9);
-    expect(r.alertes.some((a) => a.includes('se recouvrent'))).toBe(true);
+    expect(r.alertes.some((a) => a.includes('EU Ø400') && a.includes('se recouvrent'))).toBe(true);
     expect(r.alertes.some((a) => a.includes('se chevauchent'))).toBe(false);
   });
 
-  it('le tuyau qui fixe le fond change le long du tronçon', () => {
-    const t = tronconNu({
-      largeur: 2,
-      tuyaux: [base, { ...base, id: 'b', position: 0.5, filDEau: { amont: 100.5, aval: 99.5 } }],
-    });
-    const r = calculTroncon(projet(t, 2, 2), 0);
+  it('le réseau qui fixe le fond change le long du tronçon', () => {
+    const t = tronconNu({ largeur: 2, tuyaux: [eu, ep] });
+    const r = calculTroncon(projet(t, 2, 2, [100.5, 99.5]), 0);
     expect(r.H1).toBeCloseTo(2.1, 9);
     expect(r.H2).toBeCloseTo(2.6, 9);
     // H = 2,1 jusqu'à mi-longueur puis 1,6 + u : hauteur moyenne 2,225
@@ -171,13 +179,7 @@ describe('structure et décapage', () => {
   });
 
   it('les couches sont écrêtées au-dessus de l’enrobage', () => {
-    const t = tronconNu({
-      largeur: 0.8,
-      tuyaux: [
-        { id: 'p', nom: 'P', diametre: 0.4, paroi: 0, position: 0, filDEau: null, enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
-      ],
-      couches: [{ id: 'a', nom: 'Grave', epaisseur: 5 }],
-    });
+    const t = tronconNu({ largeur: 0.8, tuyaux: [tuyau], couches: [{ id: 'a', nom: 'Grave', epaisseur: 5 }] });
     const s = section(t, 2);
     expect(s.couches[0]).toBeCloseTo(0.8 * (2 - 0.7), 9);
     expect(s.remblai).toBeCloseTo(0, 9);
@@ -216,11 +218,17 @@ describe('réutilisation et foisonnement', () => {
       // conservation : fouille = enrobage + tuyaux + structure + remblai (sans écrêtage)
       const structure = r.couches.reduce((s, c) => s + c.volume, 0);
       expect(r.enrobage + r.tuyaux + structure + r.remblai).toBeCloseTo(r.fouille, 6);
+      expect(r.alertes).toEqual([]);
     }
+    // EU sur les 3 tronçons, EP sur les 2 premiers
+    expect(global.canalisations.map((c) => [c.nom, c.longueur])).toEqual([
+      ['EU', 105.5],
+      ['EP', 77.5],
+    ]);
   });
 });
 
-describe('édition du tracé', () => {
+describe('édition du tracé et des réseaux', () => {
   it('insérer puis supprimer un regard conserve la cohérence', () => {
     const p = projetExemple();
     const longueur = p.troncons.reduce((s, t) => s + t.longueur, 0);
@@ -228,6 +236,8 @@ describe('édition du tracé', () => {
     expect(q.regards).toHaveLength(5);
     expect(q.troncons).toHaveLength(4);
     expect(q.troncons.reduce((s, t) => s + t.longueur, 0)).toBeCloseTo(longueur, 9);
+    // fils d'eau interpolés pour chaque réseau
+    for (const r of p.reseaux) expect(q.regards[1].fe[r.id]).toBeCloseTo((p.regards[0].fe[r.id] + p.regards[1].fe[r.id]) / 2, 9);
     const r = supprimerRegard(q, 1);
     expect(r.troncons).toHaveLength(3);
     expect(r.troncons.reduce((s, t) => s + t.longueur, 0)).toBeCloseTo(longueur, 9);
@@ -235,9 +245,44 @@ describe('édition du tracé', () => {
     expect(insererRegard(p, 0).troncons).toHaveLength(4);
   });
 
+  it('ajouter puis supprimer un réseau', () => {
+    const p = ajouterReseau(projetExemple());
+    expect(p.reseaux).toHaveLength(3);
+    const id = p.reseaux[2].id;
+    expect(p.regards.every((g) => Number.isFinite(g.fe[id]))).toBe(true);
+    const ep = p.reseaux[1].id;
+    const q = supprimerReseau(p, ep);
+    expect(q.reseaux).toHaveLength(2);
+    expect(q.troncons.every((t) => t.tuyaux.every((x) => x.reseau !== ep))).toBe(true);
+    expect(q.regards.every((g) => !(ep in g.fe))).toBe(true);
+  });
+
   it('un projet exporté puis réimporté est identique', () => {
     const p = projetExemple();
     expect(normaliserProjet(JSON.parse(JSON.stringify(p)))).toEqual(p);
     expect(() => normaliserProjet({ regards: [] })).toThrow();
+  });
+
+  it('reprend un projet de la version précédente (fil d’eau unique, fil d’eau propre)', () => {
+    const ancien = {
+      nom: 'ancien',
+      regards: [
+        { id: 'r1', nom: 'R1', tn: 102, fe: 100 },
+        { id: 'r2', nom: 'R2', tn: 102, fe: 99.8 },
+        { id: 'r3', nom: 'R3', tn: 102, fe: 99.6 },
+      ],
+      troncons: [
+        { longueur: 10, tuyaux: [{ nom: 'EU', diametre: 0.2, filDEau: null }] },
+        { longueur: 10, tuyaux: [{ nom: 'EU', diametre: 0.2 }, { nom: 'EP', diametre: 0.3, filDEau: { amont: 100.3, aval: 100.1 } }] },
+      ],
+    };
+    const p = normaliserProjet(ancien);
+    expect(p.reseaux).toHaveLength(2);
+    const [ref, ep] = p.reseaux.map((r) => r.id);
+    expect(p.reseaux[1].nom).toBe('EP');
+    expect(p.regards.map((g) => g.fe[ref])).toEqual([100, 99.8, 99.6]);
+    expect(p.regards[1].fe[ep]).toBeCloseTo(100.3, 9);
+    expect(p.regards[2].fe[ep]).toBeCloseTo(100.1, 9);
+    expect(p.troncons[1].tuyaux.map((x) => x.reseau)).toEqual([ref, ep]);
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calculProjet } from './calc/engine';
-import { dupliquerTroncon, insererRegard, normaliserProjet, projetExemple, supprimerRegard } from './calc/projet';
-import type { Projet, Troncon } from './calc/types';
+import { ajouterReseau, dupliquerTroncon, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
+import type { Projet, Reseau, Troncon } from './calc/types';
 import { CoupeTransversale, type ModeCoupe } from './components/CoupeTransversale';
 import { DetailTroncon, TableauTroncons, TotalGlobal } from './components/Resultats';
 import { Trace } from './components/Trace';
@@ -146,6 +146,18 @@ export default function App() {
     }
   };
 
+  const retirerReseau = (r: Reseau) => {
+    const n = projet.troncons.filter((t) => t.tuyaux.some((p) => p.reseau === r.id)).length;
+    const supprimer = () => modifier((p) => supprimerReseau(p, r.id));
+    if (n === 0) supprimer();
+    else
+      setConfirmation({
+        texte: `Supprimer le réseau « ${r.nom} » ? Ses tuyaux seront retirés de ${n} tronçon${n > 1 ? 's' : ''}.`,
+        libelle: 'Supprimer le réseau',
+        action: supprimer,
+      });
+  };
+
   const copierPrecedent = () => {
     if (index === 0) return;
     const prec = projet.troncons[index - 1];
@@ -277,7 +289,6 @@ export default function App() {
       <main className="mise">
         <aside className="panneau panneau-trace">
           <h2>Tracé</h2>
-          <p className="aide">Saisir les regards dans l’ordre du tracé (altitudes en m).</p>
           <Trace
             projet={projet}
             resultats={resultats.troncons}
@@ -292,6 +303,9 @@ export default function App() {
               modifier((p) => insererRegard(p, i));
               setActif(Math.max(0, i - 1));
             }}
+            onReseau={(r) => modifier((p) => ({ ...p, reseaux: p.reseaux.map((x) => (x.id === r.id ? r : x)) }))}
+            onAjouterReseau={() => modifier(ajouterReseau)}
+            onSupprimerReseau={retirerReseau}
             onSupprimer={(i) => {
               modifier((p) => supprimerRegard(p, i));
               setActif((a) => Math.max(0, Math.min(a, i - 1)));
@@ -319,6 +333,7 @@ export default function App() {
             troncon={troncon}
             amont={projet.regards[index]}
             aval={projet.regards[index + 1]}
+            reseaux={projet.reseaux}
             mode={mode}
             onChange={majTroncon}
             selection={selection}
@@ -333,6 +348,7 @@ export default function App() {
               troncon={troncon}
               amont={projet.regards[index]}
               aval={projet.regards[index + 1]}
+              reseaux={projet.reseaux}
               onChange={majTroncon}
               selection={selection}
               onSelect={setSelection}
