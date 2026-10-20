@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { etatCoupe, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
+import { classeMateriau } from '../calc/projet';
 import type { Regard, Reseau, Troncon } from '../calc/types';
 
 interface Props {
@@ -73,7 +74,7 @@ export function MiniCoupe({ troncon: t, amont, aval, reseaux }: Props) {
             y={Yy(Math.min(g.bloc.y1, H))}
             width={(g.bloc.x1 - g.bloc.x0) * k}
             height={Math.max(0, Math.min(g.bloc.y1, H) - g.bloc.y0) * k}
-            className="enrobage"
+            className={`enrobage enr-${classeMateriau(g.tuyau.enrobage.materiau)}`}
             vectorEffect="non-scaling-stroke"
           />
         ))}

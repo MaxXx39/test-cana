@@ -1,3 +1,4 @@
+import { classeMateriau } from '../calc/projet';
 import type { Canalisation, ResultatGlobal, ResultatTroncon, VolumeExtrait } from '../calc/engine';
 import { fmt } from '../utils/format';
 
@@ -74,11 +75,15 @@ export function DetailTroncon({ r }: { r: ResultatTroncon }) {
           <tr className="groupe">
             <th colSpan={3}>Mise en œuvre</th>
           </tr>
-          <tr>
-            <td>Enrobage (net des tuyaux)</td>
-            <td className="num">{m3(r.enrobage)}</td>
-            <td className="aide">tuyaux : {m3(r.tuyaux)}</td>
-          </tr>
+          {r.enrobages.map((e, i) => (
+            <tr key={`enr-${i}`}>
+              <td>
+                <span className={`pastille enr-${classeMateriau(e.nom)}`} aria-hidden="true" /> Enrobage {e.nom.toLowerCase()}
+              </td>
+              <td className="num">{m3(e.volume)}</td>
+              <td className="aide">{i === 0 ? `net des tuyaux (${m3(r.tuyaux)})` : ''}</td>
+            </tr>
+          ))}
           {r.couches.map((c, i) => (
             <tr key={i}>
               <td>
@@ -241,7 +246,12 @@ export function TotalGlobal({ g }: { g: ResultatGlobal }) {
           <tr className="groupe">
             <th colSpan={2}>Fournitures</th>
           </tr>
-          {ligne('Enrobage', g.enrobage)}
+          {g.enrobages.map((e) => (
+            <tr key={`enr-${e.nom}`}>
+              <td>Enrobage {e.nom.toLowerCase()}</td>
+              <td className="num">{fmt(e.volume, 2)} m³</td>
+            </tr>
+          ))}
           {g.couches.map((c) => (
             <tr key={c.nom}>
               <td>{c.nom}</td>

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
-import { changerEcart, ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
+import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, materiauxEnrobage, nomMateriau, section } from '../calc/engine';
+import { changerEcart, classeMateriau, ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
 import type { ModeSaisie, Regard, Reseau, Troncon } from '../calc/types';
 import { fmt } from '../utils/format';
 import { NumberField } from './NumberField';
@@ -15,6 +15,8 @@ interface Props {
   reseaux: Reseau[];
   /** En saisie par profondeurs, les altitudes ne sont pas affichées */
   saisie: ModeSaisie;
+  /** Tranchée reprise du tronçon précédent : épaisseurs affichées sans saisie */
+  verrouille?: boolean;
   mode: ModeCoupe;
   onChange: (t: Troncon) => void;
   selection: string | null;
@@ -97,7 +99,7 @@ interface Etiquette {
   info?: string;
 }
 
-export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mode, onChange, selection, onSelect }: Props) {
+export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, verrouille = false, mode, onChange, selection, onSelect }: Props) {
   const altitudes = saisie === 'altitudes';
   // Les découpes dépendent de l'échelle : identifiants propres à chaque coupe affichée
   const idBase = `coupe${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -200,7 +202,10 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
       ...zVers(e / 2),
       texte: `Décapage ${t.surface === 'enrobe' ? 'enrobé' : 'terre'}`,
       classe: 'et-decapage',
-      epaisseur: { valeur: t.decapage.epaisseur, onChange: (v) => onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0, v) } }) },
+      epaisseur: {
+        valeur: t.decapage.epaisseur,
+        onChange: verrouille ? undefined : (v) => onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0, v) } }),
+      },
     });
   }
   sec.bornesCouches.forEach(([z1, z2], i) => {
@@ -209,7 +214,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
       ...zVers((z1 + z2) / 2),
       texte: t.couches[i].nom,
       classe: `et-couche-${i % 6}`,
-      epaisseur: { valeur: t.couches[i].epaisseur, onChange: (v) => majCouche(i, v) },
+      epaisseur: { valeur: t.couches[i].epaisseur, onChange: verrouille ? undefined : (v) => majCouche(i, v) },
     });
   });
   const zBasStructure = sec.bornesCouches.length ? Math.max(...sec.bornesCouches.map((b) => b[1])) : 0;
@@ -224,18 +229,21 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   }
   // Les tuyaux portent leur nom sur le dessin ; leur détail est listé sous la coupe, de gauche à droite.
   const tuyauxListe = [...geoms].sort((a, b) => a.cx - b.cx);
-  if (geoms.length) {
-    const ym = Math.min(...geoms.map((g) => g.bloc.y0)) + 0.03;
-    const droite = Math.max(...geoms.map((g) => g.bloc.x1));
+  // Une étiquette par nature d'enrobage, accrochée au bloc le plus à droite de cette nature
+  materiauxEnrobage(t).forEach((nomM, k) => {
+    const blocs = geoms.filter((g) => nomMateriau(g.tuyau.enrobage.materiau).toLowerCase() === nomM.toLowerCase());
+    if (!blocs.length) return;
+    const g = blocs.reduce((a, b) => (b.bloc.x1 > a.bloc.x1 ? b : a));
+    const ym = g.bloc.y0 + 0.03;
     etiquettes.push({
       y: Yy(ym),
-      ancreX: X(Math.min(droite, hw(H - ym))),
+      ancreX: X(Math.min(g.bloc.x1, hw(H - ym))),
       ancreY: Yy(ym),
-      texte: 'Enrobage',
-      info: `${fmt(sec.enrobage, 3)} m²/ml`,
-      classe: 'et-enrobage',
+      texte: `Enrobage ${nomM.toLowerCase()}`,
+      info: `${fmt(sec.enrobages[k], 3)} m²/ml`,
+      classe: `et-enrobage enr-${classeMateriau(nomM)}`,
     });
-  }
+  });
   etiquettes.sort((a, b) => a.y - b.y);
   for (let i = 1; i < etiquettes.length; i++) {
     if (etiquettes[i].y < etiquettes[i - 1].y + PAS_ETIQUETTE) etiquettes[i].y = etiquettes[i - 1].y + PAS_ETIQUETTE;
@@ -394,6 +402,10 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           <pattern id="hachures-blindage" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
             <line x1="0" y1="0" x2="0" y2="6" className="hachure-blindage" />
           </pattern>
+          <pattern id="gravier" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="3" cy="3" r="2" className="grain-gravier" />
+            <circle cx="9" cy="8.5" r="1.6" className="grain-gravier" />
+          </pattern>
           <pattern id="sable" width="7" height="7" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="0.9" className="grain" />
             <circle cx="5.5" cy="5" r="0.7" className="grain" />
@@ -421,7 +433,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               y={Yy(Math.min(g.bloc.y1, H))}
               width={(g.bloc.x1 - g.bloc.x0) * s}
               height={Math.max(0, Math.min(g.bloc.y1, H) - g.bloc.y0) * s}
-              className={`enrobage ${g.tuyau.id === idSel ? 'enrobage-sel' : ''}`}
+              className={`enrobage enr-${classeMateriau(g.tuyau.enrobage.materiau)} ${g.tuyau.id === idSel ? 'enrobage-sel' : ''}`}
             />
           ))}
           {geoms.map((g) => (
@@ -431,7 +443,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               y={Yy(Math.min(g.bloc.y1, H))}
               width={(g.bloc.x1 - g.bloc.x0) * s}
               height={Math.max(0, Math.min(g.bloc.y1, H) - g.bloc.y0) * s}
-              fill="url(#sable)"
+              fill={classeMateriau(g.tuyau.enrobage.materiau) === 'gravier' ? 'url(#gravier)' : classeMateriau(g.tuyau.enrobage.materiau) === 'beton' ? 'none' : 'url(#sable)'}
               pointerEvents="none"
             />
           ))}

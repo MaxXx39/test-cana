@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ModeSaisie, Projet, Regard, Reseau, Troncon } from '../calc/types';
 import type { ResultatTroncon } from '../calc/engine';
-import { changerDiametre, COULEURS_RESEAUX, diametreParDefaut, poserReseau, retirerReseauTroncon } from '../calc/projet';
+import { changerDiametre, classeMateriau, COULEURS_RESEAUX, diametreParDefaut, MATERIAUX_ENROBAGE, poserReseau, retirerReseauTroncon } from '../calc/projet';
 import { fmt } from '../utils/format';
 import { MiniCoupe } from './MiniCoupe';
 import { NumberField } from './NumberField';
@@ -103,8 +103,33 @@ export function Trace({
                 ×
               </button>
             </div>
+            <div className="reseau-nature">
+              <span className="reseau-enrobage-titre">Enrobage</span>
+              <select
+                className={`select-nature enr-${classeMateriau(r.enrobage.materiau)}`}
+                value={MATERIAUX_ENROBAGE.includes(r.enrobage.materiau) ? r.enrobage.materiau : ''}
+                onChange={(e) => onReseau({ ...r, enrobage: { ...r.enrobage, materiau: e.target.value } })}
+                aria-label={`Nature de l’enrobage du réseau ${r.nom}`}
+              >
+                {MATERIAUX_ENROBAGE.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+                <option value="">Autre…</option>
+              </select>
+              {!MATERIAUX_ENROBAGE.includes(r.enrobage.materiau) && (
+                <input
+                  className="input-nom"
+                  value={r.enrobage.materiau}
+                  placeholder="Nature (ex. grave 6/10)"
+                  onChange={(e) => onReseau({ ...r, enrobage: { ...r.enrobage, materiau: e.target.value } })}
+                  aria-label={`Autre nature d’enrobage du réseau ${r.nom}`}
+                />
+              )}
+            </div>
             <div className="reseau-enrobage" role="group" aria-label={`Enrobage du réseau ${r.nom}`}>
-              <span className="reseau-enrobage-titre">Enrobage (cm)</span>
+              <span className="reseau-enrobage-titre">Épaisseurs (cm)</span>
               {(
                 [
                   ['haut', 'Haut'],
@@ -263,6 +288,12 @@ export function Trace({
                     +
                   </button>
                 </div>
+                {i > 0 && (
+                  <label className="case case-petite troncon-lien">
+                    <input type="checkbox" checked={t.commePrecedent} onChange={(e) => onTroncon(i, { ...t, commePrecedent: e.target.checked })} />
+                    Même tranchée que le tronçon {i}
+                  </label>
+                )}
                 {i === actif && vueGenerale}
               </div>
             )}

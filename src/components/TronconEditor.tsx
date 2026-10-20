@@ -10,6 +10,8 @@ interface Props {
   aval: Regard;
   reseaux: Reseau[];
   saisie: ModeSaisie;
+  /** Premier tronçon du tracé (pas de tronçon précédent à suivre) */
+  premier: boolean;
   onChange: (t: Troncon) => void;
   selection: string | null;
   onSelect: (id: string | null) => void;
@@ -57,7 +59,8 @@ function OptionsExtrait({ titre, options, onChange }: { titre: string; options: 
 
 const cm = (m: number) => fmt(m * 100, 0);
 
-export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChange, selection, onSelect }: Props) {
+export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, premier, onChange, selection, onSelect }: Props) {
+  const lie = !premier && t.commePrecedent;
   const maj = (partiel: Partial<Troncon>) => onChange({ ...t, ...partiel });
   const majTuyau = (id: string, partiel: Partial<Tuyau>) =>
     maj({ tuyaux: t.tuyaux.map((p) => (p.id === id ? { ...p, ...partiel } : p)) });
@@ -83,10 +86,21 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
 
   return (
     <div className="editeur">
-      <section className="bloc-form">
+      <div className="editeur-longueur">
+        <NumberField label="Longueur du tronçon" value={t.longueur} onChange={(v) => maj({ longueur: v })} unite="m" min={0} pas={1} />
+      </div>
+      {!premier && (
+        <label className={`case bandeau-lien ${lie ? 'bandeau-lien-actif' : ''}`}>
+          <input type="checkbox" checked={lie} onChange={(e) => maj({ commePrecedent: e.target.checked })} />
+          <span>
+            Même tranchée que le tronçon précédent
+            {lie && <small> — décochez pour la modifier ici (seuls les écarts entre tuyaux restent propres au tronçon)</small>}
+          </span>
+        </label>
+      )}
+      <fieldset className="bloc-form" disabled={lie}>
         <h3>Tranchée</h3>
         <div className="grille-champs">
-          <NumberField label="Longueur" value={t.longueur} onChange={(v) => maj({ longueur: v })} unite="m" min={0} pas={1} />
           <div className="champ">
             <span className="champ-label">Type</span>
             <div className="segment" role="radiogroup" aria-label="Type de tranchée">
@@ -146,9 +160,9 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
           Profondeur de fouille : {fmt(profondeur(t, amont, aval, 0), 2)} m en amont, {fmt(profondeur(t, amont, aval, 1), 2)} m en aval. Le fond
           est calé sous le réseau le plus profond (fil d’eau − paroi − enrobage bas).
         </p>
-      </section>
+      </fieldset>
 
-      <section className="bloc-form">
+      <fieldset className="bloc-form" disabled={lie}>
         <h3>Surface et décapage</h3>
         <div className="grille-champs">
           <div className="champ">
@@ -179,7 +193,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
             />
           )}
         </div>
-      </section>
+      </fieldset>
 
       <section className="bloc-form">
         <div className="titre-actions">
@@ -252,7 +266,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
         )}
       </section>
 
-      <section className="bloc-form">
+      <fieldset className="bloc-form" disabled={lie}>
         <div className="titre-actions">
           <h3>Structure (de la surface vers le bas)</h3>
           <button
@@ -289,9 +303,9 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
           <input className="input-nom" value={t.remblaiNom} onChange={(e) => maj({ remblaiNom: e.target.value })} aria-label="Nom du remblai" />
           <span className="aide">hauteur variable, comble jusqu’à l’enrobage</span>
         </div>
-      </section>
+      </fieldset>
 
-      <section className="bloc-form">
+      <fieldset className="bloc-form" disabled={lie}>
         <h3>Matériaux extraits</h3>
         <OptionsExtrait titre="Déblai" options={t.optionsDeblai} onChange={(o) => maj({ optionsDeblai: o })} />
         {t.decapage.actif && (
@@ -301,7 +315,7 @@ export function TronconEditor({ troncon: t, amont, aval, reseaux, saisie, onChan
             onChange={(o) => maj({ optionsDecapage: o })}
           />
         )}
-      </section>
+      </fieldset>
     </div>
   );
 }

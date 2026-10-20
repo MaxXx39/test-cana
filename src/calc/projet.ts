@@ -21,7 +21,19 @@ export function couleurPour(nom: string, prises: string[]): string {
 }
 
 /** Enrobage proposé pour un nouveau réseau */
-export const ENROBAGE_DEFAUT: Enrobage = { bas: 0.1, haut: 0.15, gauche: 0.15, droite: 0.15 };
+export const ENROBAGE_DEFAUT: Enrobage = { materiau: 'Sable', bas: 0.1, haut: 0.15, gauche: 0.15, droite: 0.15 };
+
+/** Natures d'enrobage proposées ; « Autre » permet un libellé libre */
+export const MATERIAUX_ENROBAGE = ['Sable', 'Gravier', 'Béton'];
+
+/** Suffixe de classe CSS d'une nature d'enrobage (couleur sur la coupe) */
+export function classeMateriau(materiau: string): 'sable' | 'gravier' | 'beton' | 'autre' {
+  const m = materiau.trim().toLowerCase();
+  if (m === 'sable') return 'sable';
+  if (m === 'gravier') return 'gravier';
+  if (m === 'béton' || m === 'beton') return 'beton';
+  return 'autre';
+}
 
 export function nouveauReseau(nom: string, couleur: string, enrobage: Enrobage = ENROBAGE_DEFAUT): Reseau {
   return { id: nouvelId('reseau'), nom, couleur, enrobage: { ...enrobage } };
@@ -46,6 +58,7 @@ export function nouveauTroncon(longueur: number, reseau: string): Troncon {
   return {
     id: nouvelId('troncon'),
     longueur,
+    commePrecedent: false,
     type: 'U',
     largeur: 0.8,
     largeurAuto: true,
@@ -153,13 +166,13 @@ export function repartirTuyaux(tuyaux: Tuyau[]): { tuyaux: Tuyau[]; largeur: num
 /** Exemple de départ : double réseau EU + EP sur deux tronçons, EU seul sur le troisième */
 export function projetExemple(): Projet {
   const eu = nouveauReseau('EU', '#a8652f');
-  const ep = nouveauReseau('EP', '#2f80c4');
+  const ep = nouveauReseau('EP', '#2f80c4', { ...ENROBAGE_DEFAUT, materiau: 'Gravier' });
   const r = (nom: string, tn: number, feEu: number, feEp: number) => nouveauRegard(nom, tn, { [eu.id]: feEu, [ep.id]: feEp });
   const regards = [r('R1', 102.4, 100.8, 101.05), r('R2', 102.1, 100.55, 100.8), r('R3', 101.6, 100.3, 100.55), r('R4', 101.5, 100.05, 100.3)];
 
   const double = (longueur: number) => {
     const t = nouveauTroncon(longueur, eu.id);
-    const { tuyaux, largeur } = repartirTuyaux([nouveauTuyau(eu.id, 0.2), nouveauTuyau(ep.id, 0.4)]);
+    const { tuyaux, largeur } = repartirTuyaux([nouveauTuyau(eu.id, 0.2, 0, eu.enrobage), nouveauTuyau(ep.id, 0.4, 0, ep.enrobage)]);
     t.tuyaux = tuyaux;
     t.largeur = largeur;
     t.blindage = 0.05;
@@ -168,7 +181,7 @@ export function projetExemple(): Projet {
   const t1 = double(35);
   const t2 = double(42.5);
   const t3 = nouveauTroncon(28, eu.id);
-  t3.tuyaux = [nouveauTuyau(eu.id, 0.2)];
+  t3.tuyaux = [nouveauTuyau(eu.id, 0.2, 0, eu.enrobage)];
   t3.type = 'V';
   t3.largeur = 0.6;
   t3.surface = 'terre';
@@ -238,6 +251,42 @@ export function retirerReseauTroncon(t: Troncon, reseau: string): Troncon {
   return recentrer({ ...t, tuyaux: reste }, t.largeurAuto);
 }
 
+/** Recopie la tranchée type (hors tuyaux et longueur) d'un tronçon sur un autre */
+function copierTranchee(modele: Troncon, t: Troncon): Troncon {
+  return ajusterLargeur({
+    ...t,
+    type: modele.type,
+    largeur: modele.largeur,
+    largeurAuto: modele.largeurAuto,
+    blindage: modele.blindage,
+    fruit: modele.fruit,
+    surface: modele.surface,
+    decapage: { ...modele.decapage },
+    couches: modele.couches.map((c) => ({ ...c })),
+    remblaiNom: modele.remblaiNom,
+    optionsDeblai: { ...modele.optionsDeblai },
+    optionsDecapage: { ...modele.optionsDecapage },
+  });
+}
+
+/**
+ * Applique « même tranchée que le précédent » de proche en proche, de l'amont vers
+ * l'aval : une chaîne de tronçons cochés reprend la tranchée du premier non coché.
+ */
+export function propagerTranchees(p: Projet): Projet {
+  let change = false;
+  const troncons = [...p.troncons];
+  for (let i = 1; i < troncons.length; i++) {
+    if (!troncons[i].commePrecedent) continue;
+    const copie = copierTranchee(troncons[i - 1], troncons[i]);
+    if (JSON.stringify(copie) !== JSON.stringify(troncons[i])) {
+      troncons[i] = copie;
+      change = true;
+    }
+  }
+  return change ? { ...p, troncons } : p;
+}
+
 /** Ce que l'on recopie d'un tronçon vers d'autres */
 export interface OptionsDuplication {
   /** Tuyaux : réseaux, diamètres, écarts et enrobages (sinon les tuyaux de la cible sont gardés) */
@@ -255,7 +304,7 @@ export function dupliquerVers(p: Projet, source: number, cibles: number[], optio
     ...p,
     troncons: p.troncons.map((t, i) => {
       if (i === source || !cibles.includes(i)) return t;
-      const copie = { ...dupliquerTroncon(modele, t.longueur), id: t.id };
+      const copie = { ...dupliquerTroncon(modele, t.longueur), id: t.id, commePrecedent: false };
       if (!options.tuyaux) copie.tuyaux = t.tuyaux;
       return ajusterLargeur(copie);
     }),
@@ -270,7 +319,8 @@ export function majReseau(p: Projet, r: Reseau): Projet {
   const avant = p.reseaux.find((x) => x.id === r.id);
   const reseaux = p.reseaux.map((x) => (x.id === r.id ? r : x));
   const e = r.enrobage;
-  if (avant && avant.enrobage.bas === e.bas && avant.enrobage.haut === e.haut && avant.enrobage.gauche === e.gauche && avant.enrobage.droite === e.droite) {
+  const a = avant?.enrobage;
+  if (a && a.materiau === e.materiau && a.bas === e.bas && a.haut === e.haut && a.gauche === e.gauche && a.droite === e.droite) {
     return { ...p, reseaux };
   }
   return {
@@ -333,14 +383,14 @@ export function insererRegard(p: Projet, index: number): Projet {
     const coupe = troncons[index - 1];
     const moitie = Math.round((coupe.longueur / 2) * 100) / 100;
     troncons[index - 1] = { ...coupe, longueur: moitie };
-    troncons.splice(index, 0, dupliquerTroncon(coupe, coupe.longueur - moitie));
+    troncons.splice(index, 0, { ...dupliquerTroncon(coupe, coupe.longueur - moitie), commePrecedent: true });
   } else if (avant) {
     r = nouveauRegard('', avant.tn, feDecale(avant, -0.2));
     const modele = troncons[troncons.length - 1];
-    troncons.push(modele ? dupliquerTroncon(modele) : nouveauTroncon(30, p.reseaux[0].id));
+    troncons.push(modele ? { ...dupliquerTroncon(modele), commePrecedent: true } : nouveauTroncon(30, p.reseaux[0].id));
   } else {
     r = nouveauRegard('', apres.tn, feDecale(apres, 0.2));
-    troncons.unshift(troncons[0] ? dupliquerTroncon(troncons[0]) : nouveauTroncon(30, p.reseaux[0].id));
+    troncons.unshift(troncons[0] ? { ...dupliquerTroncon(troncons[0]), commePrecedent: false } : nouveauTroncon(30, p.reseaux[0].id));
   }
   r.nom = `R${regards.length + 1}`;
   regards.splice(index, 0, r);
@@ -386,6 +436,7 @@ export function normaliserProjet(brut: unknown): Projet {
   }
 
   const lireEnrobage = (e: Brut | undefined): Enrobage => ({
+    materiau: typeof e?.materiau === 'string' ? e.materiau : ENROBAGE_DEFAUT.materiau,
     bas: nombre(e?.bas, ENROBAGE_DEFAUT.bas),
     haut: nombre(e?.haut, ENROBAGE_DEFAUT.haut),
     gauche: nombre(e?.gauche, ENROBAGE_DEFAUT.gauche),
@@ -430,6 +481,7 @@ export function normaliserProjet(brut: unknown): Projet {
   const troncons: Troncon[] = (o.troncons as Brut[]).map((t, ti) => ({
     id: typeof t?.id === 'string' ? t.id : nouvelId('troncon'),
     longueur: nombre(t?.longueur, base.longueur),
+    commePrecedent: ti > 0 && t?.commePrecedent === true,
     type: t?.type === 'V' ? ('V' as const) : ('U' as const),
     largeur: nombre(t?.largeur, base.largeur),
     largeurAuto: typeof t?.largeurAuto === 'boolean' ? t.largeurAuto : false,

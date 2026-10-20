@@ -177,6 +177,21 @@ export function aireReunionBlocs(t: Troncon, blocs: Rect[], H: number): number {
   return aire;
 }
 
+/** Libellé de la nature d'enrobage (vide → « Autre ») */
+export function nomMateriau(materiau: string): string {
+  return materiau.trim() || 'Autre';
+}
+
+/** Natures d'enrobage présentes dans le tronçon, dans l'ordre des tuyaux */
+export function materiauxEnrobage(t: Troncon): string[] {
+  const liste: string[] = [];
+  for (const p of t.tuyaux) {
+    const m = nomMateriau(p.enrobage.materiau);
+    if (!liste.some((x) => x.toLowerCase() === m.toLowerCase())) liste.push(m);
+  }
+  return liste;
+}
+
 export interface Section {
   H: number;
   /** Aire totale de fouille */
@@ -186,6 +201,8 @@ export interface Section {
   deblai: number;
   /** Enrobage net (blocs moins tuyaux) */
   enrobage: number;
+  /** Enrobage net par nature, dans l'ordre de materiauxEnrobage(t) */
+  enrobages: number[];
   tuyaux: number;
   couches: number[];
   remblai: number;
@@ -217,6 +234,19 @@ export function section(t: Troncon, Hbrut: number, basTuyaux: number[] = basTuya
   const aireBlocs = aireReunionBlocs(t, blocs, H);
   const tuyaux = geoms.reduce((s, g) => s + Math.PI * g.r * g.r, 0);
 
+  // Par nature : la réunion des blocs est attribuée nature par nature, dans l'ordre ; une
+  // zone commune à deux natures n'est comptée qu'une fois (pour la première).
+  const materiaux = materiauxEnrobage(t);
+  const rang = (g: GeomTuyau) => materiaux.findIndex((m) => m.toLowerCase() === nomMateriau(g.tuyau.enrobage.materiau).toLowerCase());
+  let cumul = 0;
+  const enrobages = materiaux.map((_, k) => {
+    const reunion = aireReunionBlocs(t, geoms.filter((g) => rang(g) <= k).map((g) => g.bloc), H);
+    const propre = reunion - cumul;
+    cumul = reunion;
+    const tubes = geoms.filter((g) => rang(g) === k).reduce((a, g) => a + Math.PI * g.r * g.r, 0);
+    return Math.max(0, propre - tubes);
+  });
+
   // Les couches de structure s'empilent depuis la surface et s'arrêtent au-dessus de l'enrobage.
   const zLimite = Math.max(0, H - hautEnrobage);
   const bornesCouches: [number, number][] = [];
@@ -236,6 +266,7 @@ export function section(t: Troncon, Hbrut: number, basTuyaux: number[] = basTuya
     decapage,
     deblai: fouille - decapage,
     enrobage: Math.max(0, aireBlocs - tuyaux),
+    enrobages,
     tuyaux,
     couches,
     remblai: Math.max(0, fouille - aireBlocs - totalCouches),
@@ -259,12 +290,23 @@ function ruptures(t: Troncon, amont: Regard, aval: Regard): number[] {
   return [...new Set(us)].sort((a, b) => a - b);
 }
 
-type Grandeurs = Pick<Section, 'H' | 'fouille' | 'decapage' | 'deblai' | 'enrobage' | 'tuyaux' | 'remblai' | 'largeurTete' | 'couches'>;
+type Grandeurs = Pick<Section, 'H' | 'fouille' | 'decapage' | 'deblai' | 'enrobage' | 'enrobages' | 'tuyaux' | 'remblai' | 'largeurTete' | 'couches'>;
 const CHAMPS = ['H', 'fouille', 'decapage', 'deblai', 'enrobage', 'tuyaux', 'remblai', 'largeurTete'] as const;
 
 /** Moyennes des grandeurs de section le long du tronçon (Simpson par morceaux) */
 function moyennesLongueur(t: Troncon, amont: Regard, aval: Regard): Grandeurs {
-  const m: Grandeurs = { H: 0, fouille: 0, decapage: 0, deblai: 0, enrobage: 0, tuyaux: 0, remblai: 0, largeurTete: 0, couches: t.couches.map(() => 0) };
+  const m: Grandeurs = {
+    H: 0,
+    fouille: 0,
+    decapage: 0,
+    deblai: 0,
+    enrobage: 0,
+    enrobages: materiauxEnrobage(t).map(() => 0),
+    tuyaux: 0,
+    remblai: 0,
+    largeurTete: 0,
+    couches: t.couches.map(() => 0),
+  };
   const us = ruptures(t, amont, aval);
   const n = SIMPSON_INTERVALLES;
   for (let k = 0; k + 1 < us.length; k++) {
@@ -275,6 +317,7 @@ function moyennesLongueur(t: Troncon, amont: Regard, aval: Regard): Grandeurs {
       const sec = section(t, e.H, e.basTuyaux);
       for (const c of CHAMPS) m[c] += w * sec[c];
       sec.couches.forEach((v, j) => (m.couches[j] += w * v));
+      sec.enrobages.forEach((v, j) => (m.enrobages[j] += w * v));
     }
   }
   return m;
@@ -300,6 +343,8 @@ export interface ResultatTroncon {
   decapage: number;
   deblai: number;
   enrobage: number;
+  /** Enrobage par nature (sable, gravier, béton…) */
+  enrobages: { nom: string; volume: number }[];
   tuyaux: number;
   couches: { nom: string; volume: number }[];
   remblai: number;
@@ -417,6 +462,7 @@ export function calculTroncon(p: Projet, index: number): ResultatTroncon {
     decapage,
     deblai,
     enrobage: L * m.enrobage,
+    enrobages: materiauxEnrobage(t).map((nom, i) => ({ nom, volume: L * m.enrobages[i] })),
     tuyaux: L * m.tuyaux,
     couches: t.couches.map((c, i) => ({ nom: c.nom, volume: L * m.couches[i] })),
     remblai,
@@ -443,6 +489,7 @@ export interface ResultatGlobal {
   decapageEnrobe: number;
   deblai: number;
   enrobage: number;
+  enrobages: { nom: string; volume: number }[];
   tuyaux: number;
   couches: { nom: string; volume: number }[];
   remblai: number;
@@ -458,15 +505,18 @@ export interface ResultatGlobal {
 
 export function calculGlobal(resultats: ResultatTroncon[]): ResultatGlobal {
   const somme = (g: (r: ResultatTroncon) => number) => resultats.reduce((s, r) => s + g(r), 0);
-  const couches = new Map<string, { nom: string; volume: number }>();
-  for (const r of resultats) {
-    for (const c of r.couches) {
+  /** Regroupe des volumes par nom, sans tenir compte de la casse */
+  const regrouper = (listes: { nom: string; volume: number }[][]) => {
+    const m = new Map<string, { nom: string; volume: number }>();
+    for (const c of listes.flat()) {
       const cle = c.nom.trim().toLowerCase();
-      const cur = couches.get(cle);
+      const cur = m.get(cle);
       if (cur) cur.volume += c.volume;
-      else couches.set(cle, { nom: c.nom.trim(), volume: c.volume });
+      else m.set(cle, { nom: c.nom.trim(), volume: c.volume });
     }
-  }
+    return [...m.values()];
+  };
+  const couches = regrouper(resultats.map((r) => r.couches));
   const canalisations: Canalisation[] = [];
   for (const r of resultats) {
     for (const c of r.canalisations) {
@@ -483,8 +533,9 @@ export function calculGlobal(resultats: ResultatTroncon[]): ResultatGlobal {
     decapageEnrobe: somme((r) => (r.surface === 'enrobe' ? r.decapage : 0)),
     deblai: somme((r) => r.deblai),
     enrobage: somme((r) => r.enrobage),
+    enrobages: regrouper(resultats.map((r) => r.enrobages)),
     tuyaux: somme((r) => r.tuyaux),
-    couches: [...couches.values()],
+    couches,
     remblai: somme((r) => r.remblai),
     surfaceTete: somme((r) => r.surfaceTete),
     surfaceBlindage: somme((r) => r.surfaceBlindage),

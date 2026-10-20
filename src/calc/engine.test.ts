@@ -3,6 +3,7 @@ import { aireReunionBlocs, calculProjet, calculTroncon, etatCoupe, profondeur, s
 import {
   ajouterReseau,
   majReseau,
+  propagerTranchees,
   changerDiametre,
   changerEcart,
   dupliquerVers,
@@ -43,8 +44,8 @@ function projet(t: Troncon, H1: number, H2: number, ep: [number, number] = [100,
     nom: 't',
     saisie: 'altitudes',
     reseaux: [
-      { id: EU, nom: 'EU', couleur: '#000', enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
-      { id: EP, nom: 'EP', couleur: '#00f', enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
+      { id: EU, nom: 'EU', couleur: '#000', enrobage: { materiau: 'Sable', bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
+      { id: EP, nom: 'EP', couleur: '#00f', enrobage: { materiau: 'Sable', bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 } },
     ],
     regards: [nouveauRegard('A', 100 + H1, { [EU]: 100, [EP]: ep[0] }), nouveauRegard('B', 100 + H2, { [EU]: 100, [EP]: ep[1] })],
     troncons: [t],
@@ -57,7 +58,7 @@ const tuyau: Tuyau = {
   diametre: 0.4,
   paroi: 0,
   position: 0,
-  enrobage: { bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
+  enrobage: { materiau: 'Sable', bas: 0.1, haut: 0.2, gauche: 0.2, droite: 0.2 },
 };
 
 describe('volumes de fouille', () => {
@@ -80,8 +81,8 @@ describe('volumes de fouille', () => {
   it('la profondeur intègre le calage sous fil d’eau du tuyau le plus exigeant', () => {
     const t = tronconNu({
       tuyaux: [
-        { ...tuyau, paroi: 0.03, enrobage: { bas: 0.1, haut: 0.1, gauche: 0.1, droite: 0.1 } },
-        { ...tuyau, id: 'q', position: 1, enrobage: { bas: 0.15, haut: 0.1, gauche: 0.1, droite: 0.1 } },
+        { ...tuyau, paroi: 0.03, enrobage: { materiau: 'Sable', bas: 0.1, haut: 0.1, gauche: 0.1, droite: 0.1 } },
+        { ...tuyau, id: 'q', position: 1, enrobage: { materiau: 'Sable', bas: 0.15, haut: 0.1, gauche: 0.1, droite: 0.1 } },
       ],
     });
     const p = projet(t, 2, 2);
@@ -191,6 +192,28 @@ describe('trois réseaux ou plus', () => {
     expect(r.canalisations.map((c) => c.nom)).toEqual(['EU', 'EP', 'AEP']);
     const structure = r.couches.reduce((a, c) => a + c.volume, 0);
     expect(r.enrobage + r.tuyaux + structure + r.remblai).toBeCloseTo(r.fouille, 6);
+  });
+});
+
+describe('nature de l’enrobage', () => {
+  it('volumes d’enrobage par nature, total inchangé', () => {
+    const sable = { ...tuyau, id: 'a', position: -0.5 };
+    const beton = { ...tuyau, id: 'b', reseau: EP, position: 0.5, enrobage: { ...tuyau.enrobage, materiau: 'Béton' } };
+    const t = tronconNu({ largeur: 2, tuyaux: [sable, beton] });
+    const r = calculTroncon(projet(t, 2, 2), 0);
+    const net = 10 * (0.8 * 0.7 - Math.PI * 0.04);
+    expect(r.enrobages).toEqual([
+      { nom: 'Sable', volume: expect.closeTo(net, 9) },
+      { nom: 'Béton', volume: expect.closeTo(net, 9) },
+    ]);
+    expect(r.enrobage).toBeCloseTo(2 * net, 9);
+    // blocs qui se recouvrent : la zone commune est comptée une seule fois, pour la première nature
+    const t2 = tronconNu({ largeur: 2, tuyaux: [{ ...sable, position: -0.3 }, { ...beton, position: 0.3 }] });
+    const r2 = calculTroncon(projet(t2, 2, 2), 0);
+    expect(r2.enrobages[0].volume + r2.enrobages[1].volume).toBeCloseTo(r2.enrobage, 9);
+    expect(r2.enrobages[0].volume).toBeCloseTo(net, 9);
+    const g = calculProjet(projet(t, 2, 2)).global;
+    expect(g.enrobages.map((e) => e.nom)).toEqual(['Sable', 'Béton']);
   });
 });
 
@@ -325,7 +348,7 @@ describe('édition du tracé et des réseaux', () => {
   });
 
   it('le blindage élargit la fouille, pas la largeur utile des tuyaux', () => {
-    const t = tronconNu({ largeur: 1, blindage: 0.05, tuyaux: [{ ...tuyau, enrobage: { bas: 0.1, haut: 0.2, gauche: 0.3, droite: 0.3 } }] });
+    const t = tronconNu({ largeur: 1, blindage: 0.05, tuyaux: [{ ...tuyau, enrobage: { materiau: 'Sable', bas: 0.1, haut: 0.2, gauche: 0.3, droite: 0.3 } }] });
     const r = calculTroncon(projet(t, 2, 2), 0);
     expect(r.fouille).toBeCloseTo(10 * 1.1 * 2.1, 9);
     expect(r.surfaceTete).toBeCloseTo(10 * 1.1, 9);
@@ -363,10 +386,10 @@ describe('édition du tracé et des réseaux', () => {
   it('l’enrobage se règle par réseau et s’applique à tous ses tuyaux', () => {
     const p = projetExemple();
     const ep = p.reseaux[1];
-    const q = majReseau(p, { ...ep, enrobage: { bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 } });
+    const q = majReseau(p, { ...ep, enrobage: { materiau: 'Sable', bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 } });
     const tuyauxEp = q.troncons.flatMap((t) => t.tuyaux.filter((x) => x.reseau === ep.id));
     expect(tuyauxEp).toHaveLength(2);
-    for (const x of tuyauxEp) expect(x.enrobage).toEqual({ bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 });
+    for (const x of tuyauxEp) expect(x.enrobage).toEqual({ materiau: 'Sable', bas: 0.12, haut: 0.3, gauche: 0.2, droite: 0.25 });
     // EU inchangé, écart nu à nu conservé, largeur automatique ajustée (+5 cm à gauche, +10 cm à droite)
     expect(q.troncons[0].tuyaux.find((x) => x.reseau === p.reseaux[0].id)!.enrobage).toEqual(p.reseaux[0].enrobage);
     expect(ecartsTuyaux(tuyauxGaucheDroite(q.troncons[0].tuyaux))[1]).toBeCloseTo(0.3, 9);
@@ -374,6 +397,30 @@ describe('édition du tracé et des réseaux', () => {
     // un nouveau tuyau EP prend l’enrobage du réseau
     const t3 = poserReseau(q.troncons[2], q.reseaux[1], 0.4, q.reseaux.map((r) => r.id));
     expect(t3.tuyaux.find((x) => x.reseau === ep.id)!.enrobage).toEqual(q.reseaux[1].enrobage);
+  });
+
+  it('même tranchée que le tronçon précédent, de proche en proche', () => {
+    const p = projetExemple();
+    const lie = { ...p, troncons: p.troncons.map((t, i) => (i === 2 ? { ...t, commePrecedent: true } : t)) };
+    const q = propagerTranchees(lie);
+    const [t2, t3] = [q.troncons[1], q.troncons[2]];
+    expect(t3.type).toBe(t2.type);
+    expect(t3.blindage).toBe(t2.blindage);
+    expect(t3.couches.map((c) => [c.nom, c.epaisseur])).toEqual(t2.couches.map((c) => [c.nom, c.epaisseur]));
+    // ses tuyaux et sa longueur restent les siens (EU seul, 28 m)
+    expect(t3.tuyaux.map((x) => x.reseau)).toEqual([p.reseaux[0].id]);
+    expect(t3.longueur).toBe(28);
+    // une modification du tronçon 2 se propage, un projet déjà à jour est renvoyé tel quel
+    expect(propagerTranchees(q)).toBe(q);
+    const r = propagerTranchees({
+      ...q,
+      troncons: q.troncons.map((t, i) => (i === 1 ? { ...t, couches: [{ ...t.couches[0], epaisseur: 0.1 }] } : t)),
+    });
+    expect(r.troncons[2].couches.map((c) => c.epaisseur)).toEqual([0.1]);
+    // chaîne : 2 suit 1, 3 suit 2
+    const chaine = propagerTranchees({ ...lie, troncons: lie.troncons.map((t, i) => (i === 1 ? { ...t, commePrecedent: true, blindage: 0.2 } : t)) });
+    expect(chaine.troncons[1].blindage).toBe(p.troncons[0].blindage);
+    expect(chaine.troncons[2].blindage).toBe(p.troncons[0].blindage);
   });
 
   it('ajouter puis supprimer un réseau', () => {

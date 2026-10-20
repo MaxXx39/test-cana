@@ -23,6 +23,8 @@ export interface Regard {
 }
 
 export interface Enrobage {
+  /** Nature du matériau d'enrobage : Sable, Gravier, Béton ou libellé libre */
+  materiau: string;
   bas: number;
   haut: number;
   gauche: number;
@@ -62,6 +64,11 @@ export interface Troncon {
   id: string;
   /** Longueur du tronçon entre les deux regards */
   longueur: number;
+  /**
+   * Même tranchée type que le tronçon précédent : type, largeur, blindage, talus, surface,
+   * décapage, structure et matériaux en sont recopiés (les tuyaux restent propres au tronçon)
+   */
+  commePrecedent: boolean;
   type: TrenchType;
   /** Largeur utile de tranchée en fond (entre blindages pour une tranchée en U) */
   largeur: number;

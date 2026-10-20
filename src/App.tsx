@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calculProjet } from './calc/engine';
-import { ajouterReseau, ajusterLargeur, dupliquerVers, majReseau, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
+import { ajouterReseau, ajusterLargeur, dupliquerVers, majReseau, propagerTranchees, insererRegard, normaliserProjet, projetExemple, supprimerRegard, supprimerReseau } from './calc/projet';
 import type { Projet, Reseau, Troncon } from './calc/types';
 import { CoupeTransversale, type ModeCoupe } from './components/CoupeTransversale';
 import { DetailTroncon, TableauTroncons, TotalGlobal } from './components/Resultats';
@@ -56,7 +56,8 @@ export default function App() {
   const modifier = useCallback(
     (suivant: Projet | ((p: Projet) => Projet)) => {
       const p = courant.current;
-      const n = typeof suivant === 'function' ? suivant(p) : suivant;
+      // « Même tranchée que le précédent » est réappliqué après chaque modification
+      const n = propagerTranchees(typeof suivant === 'function' ? suivant(p) : suivant);
       if (n === p) return;
       const maintenant = Date.now();
       if (maintenant - derniereModif.current > REGROUPEMENT_MS) {
@@ -199,6 +200,7 @@ export default function App() {
         aval={projet.regards[index + 1]}
         reseaux={projet.reseaux}
         saisie={projet.saisie}
+        verrouille={index > 0 && troncon.commePrecedent}
         mode={mode}
         onChange={majTroncon}
         selection={selection}
@@ -351,6 +353,7 @@ export default function App() {
             aval={projet.regards[index + 1]}
             reseaux={projet.reseaux}
             saisie={projet.saisie}
+            verrouille={index > 0 && troncon.commePrecedent}
             mode={mode}
             onChange={majTroncon}
             selection={selection}
@@ -367,6 +370,7 @@ export default function App() {
               aval={projet.regards[index + 1]}
               reseaux={projet.reseaux}
               saisie={projet.saisie}
+              premier={index === 0}
               onChange={majTroncon}
               selection={selection}
               onSelect={setSelection}

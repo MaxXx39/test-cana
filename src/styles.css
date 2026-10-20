@@ -17,6 +17,9 @@
   --c-hachure: #d6c8ad;
   --c-remblai: #cdb68e;
   --c-enrobage: #f7e594;
+  --c-enr-gravier: #d3cdc0;
+  --c-enr-beton: #c3c8cf;
+  --c-enr-autre: #ecd2b0;
   --c-enrobage-bord: #c9a93c;
   --c-surface-enrobe: #3a3d42;
   --c-surface-terre: #7b8b4a;
@@ -63,6 +66,9 @@
     --c-hachure: #3c3529;
     --c-remblai: #6b5b3e;
     --c-enrobage: #9c8836;
+    --c-enr-gravier: #6c665b;
+    --c-enr-beton: #5d636c;
+    --c-enr-autre: #7f6a4c;
     --c-enrobage-bord: #c9a93c;
     --c-surface-enrobe: #111316;
     --c-surface-terre: #4f5c2c;
@@ -103,6 +109,9 @@
   --c-hachure: #3c3529;
   --c-remblai: #6b5b3e;
   --c-enrobage: #9c8836;
+  --c-enr-gravier: #6c665b;
+  --c-enr-beton: #5d636c;
+  --c-enr-autre: #7f6a4c;
   --c-enrobage-bord: #c9a93c;
   --c-surface-enrobe: #111316;
   --c-surface-terre: #4f5c2c;
@@ -1736,4 +1745,98 @@ th {
 
 .tuyau-pied .champ {
   width: 110px;
+}
+
+/* ---------- Natures d'enrobage ---------- */
+.enrobage.enr-gravier,
+.etiquette-pastille.enr-gravier {
+  fill: var(--c-enr-gravier);
+}
+.enrobage.enr-beton,
+.etiquette-pastille.enr-beton {
+  fill: var(--c-enr-beton);
+}
+.enrobage.enr-autre,
+.etiquette-pastille.enr-autre {
+  fill: var(--c-enr-autre);
+}
+
+.pastille.enr-sable,
+.legende .enr-sable::before {
+  background: var(--c-enrobage);
+}
+.pastille.enr-gravier,
+.legende .enr-gravier::before {
+  background: var(--c-enr-gravier);
+}
+.pastille.enr-beton,
+.legende .enr-beton::before {
+  background: var(--c-enr-beton);
+}
+.pastille.enr-autre,
+.legende .enr-autre::before {
+  background: var(--c-enr-autre);
+}
+
+.grain-gravier {
+  fill: none;
+  stroke: var(--texte-2);
+  stroke-width: 0.8;
+  opacity: 0.6;
+}
+
+.reseau-nature {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.reseau-nature .reseau-enrobage-titre {
+  padding-bottom: 0;
+}
+
+.select-nature {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--c-enrobage-bord);
+  border-radius: 6px;
+  padding: 0.25rem 0.3rem;
+  color: var(--texte);
+  background: var(--panneau);
+  min-width: 0;
+}
+
+/* ---------- Tronçon qui suit le précédent ---------- */
+.troncon-lien {
+  margin-top: 0.1rem;
+}
+
+.bandeau-lien {
+  padding: 0.5rem 0.7rem;
+  border: 1px dashed var(--bord-fort);
+  border-radius: 8px;
+  align-items: flex-start;
+}
+
+.bandeau-lien-actif {
+  border-color: var(--accent);
+  background: var(--accent-doux);
+}
+
+.bandeau-lien small {
+  color: var(--texte-2);
+}
+
+fieldset.bloc-form {
+  margin: 0;
+  min-width: 0;
+}
+
+fieldset.bloc-form:disabled {
+  opacity: 0.6;
+}
+
+.editeur-longueur {
+  max-width: 200px;
 }

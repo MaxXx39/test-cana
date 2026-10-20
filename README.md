@@ -17,8 +17,9 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
 ## Utilisation
 
 1. **Réseaux** (haut de la colonne de gauche) : déclarer les réseaux qui partagent la
-   tranchée (EU, EP…), chacun avec sa couleur et son enrobage (haut, lit de pose,
-   gauche, droite), appliqué à tous ses tuyaux dans tous les tronçons.
+   tranchée (EU, EP…), chacun avec sa couleur et son enrobage : nature (sable, gravier,
+   béton ou autre) et épaisseurs (haut, lit de pose, gauche, droite), appliqué à tous ses
+   tuyaux dans tous les tronçons. Les volumes d’enrobage sont donnés par nature.
 2. **Tracé** : saisir les regards dans l’ordre et la longueur de chaque tronçon. À chaque
    regard, une ligne par réseau : la case indique que le réseau part vers le regard
    suivant, puis viennent son fil d’eau (ou sa profondeur) et le diamètre du tuyau vers
@@ -28,7 +29,9 @@ npm run build    # produit dist/index.html, un fichier autonome utilisable hors 
      volumes ne dépendent que des profondeurs).
 3. **Tronçon** : cliquer un tronçon dans le Tracé ; sa vue générale (coupe complète,
    regards amont et aval) s’ouvre sous lui, avec « Dupliquer vers… » pour recopier sa
-   tranchée (et au choix ses tuyaux) vers d’autres tronçons. Les autres tronçons montrent
+   tranchée (et au choix ses tuyaux) vers d’autres tronçons. La case « Même tranchée que
+   le tronçon précédent » lie un tronçon au précédent : sa tranchée type (largeur,
+   blindage, surface, décapage, structure, matériaux) suit, ses tuyaux restent les siens. Les autres tronçons montrent
    une vignette. La fiche du tronçon règle la tranchée (largeur, automatique ou non,
    blindage en U), l’écart entre tuyaux, leur enrobage et la structure. La coupe est
    dessinée à l’échelle, regard amont à gauche et aval à droite (un puits par réseau).
