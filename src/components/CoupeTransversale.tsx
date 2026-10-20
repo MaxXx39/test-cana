@@ -493,22 +493,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
         </div>
         {/* En mode compact, la largeur ajoutée ou la pente se saisit ici plutôt que sur le dessin */}
         {gab.compact && !verrouille && champTypeFouille}
-        <span className="coupe-type-titre">Surface</span>
-        <div className="segment segment-petit" role="radiogroup" aria-label="Nature du dessus">
-          {(['terre', 'enrobe'] as const).map((su) => (
-            <button
-              key={su}
-              type="button"
-              role="radio"
-              aria-checked={t.surface === su}
-              className={t.surface === su ? 'actif' : ''}
-              disabled={verrouille}
-              onClick={() => onChange({ ...t, surface: su })}
-            >
-              {su === 'terre' ? 'Terre' : 'Enrobé'}
-            </button>
-          ))}
-        </div>
         {tries.length > 1 && !verrouille && (
           <button
             type="button"
@@ -523,6 +507,22 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, ve
           </button>
         )}
         <span className={`groupe-option groupe-decapage ${t.decapage.actif ? 'groupe-actif' : ''}`}>
+          <span className="coupe-type-titre">Surface</span>
+          <div className="segment segment-petit" role="radiogroup" aria-label="Nature du dessus">
+            {(['terre', 'enrobe'] as const).map((su) => (
+              <button
+                key={su}
+                type="button"
+                role="radio"
+                aria-checked={t.surface === su}
+                className={t.surface === su ? 'actif' : ''}
+                disabled={verrouille}
+                onClick={() => onChange({ ...t, surface: su })}
+              >
+                {su === 'terre' ? 'Terre' : 'Enrobé'}
+              </button>
+            ))}
+          </div>
         <label className="case">
           <input
             type="checkbox"
