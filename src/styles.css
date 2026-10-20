@@ -952,35 +952,6 @@ polygon.couche {
   font-size: 9px;
 }
 
-.poignee {
-  cursor: ew-resize;
-}
-
-.poignee-v {
-  cursor: ns-resize;
-}
-
-.poignee-zone {
-  fill: transparent;
-}
-
-.poignee-point {
-  fill: var(--panneau);
-  stroke: var(--texte-2);
-  stroke-width: 1.5;
-}
-
-.poignee-active .poignee-point {
-  stroke: var(--poignee);
-  stroke-width: 2.5;
-}
-
-.poignee:hover .poignee-point,
-.poignee:active .poignee-point {
-  fill: var(--poignee);
-  stroke: var(--poignee);
-}
-
 .etiquette-pastille.et-remblai {
   fill: var(--c-remblai);
 }
@@ -1674,4 +1645,92 @@ th {
 
 .duplication .aide {
   margin: 0;
+}
+
+/* ---------- Saisie sur la coupe ---------- */
+.champ-coupe {
+  overflow: visible;
+}
+
+.nf-coupe {
+  width: 100%;
+  height: 100%;
+  font-size: 12px;
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.nf-coupe input {
+  padding: 0 0.15rem 0 0.25rem;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.nf-coupe .nf-unite {
+  font-size: 10px;
+  padding-right: 0.3rem;
+}
+
+.nf-coupe.nf-enrobage {
+  border-color: var(--c-enrobage-bord);
+  border-width: 1.5px;
+}
+
+.nf-coupe.nf-ecart {
+  border-color: var(--poignee);
+  border-width: 1.5px;
+}
+
+.etiquette-valeur {
+  font-size: 12px;
+  fill: var(--texte-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.tuyau {
+  cursor: pointer;
+}
+
+.saisie-tuyau {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--bord);
+  border-left: 4px solid var(--pastille);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.saisie-tuyau strong {
+  color: var(--pastille);
+}
+
+.saisie-tuyau-champ {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--texte-2);
+}
+
+.saisie-tuyau-champ .nf-coupe,
+.legende .nf-coupe {
+  width: 72px;
+  height: 26px;
+}
+
+.legende:has(.nf-coupe) {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.legende li {
+  gap: 0.4rem;
+}
+
+.legende-valeur {
+  color: var(--texte-2);
+  font-variant-numeric: tabular-nums;
 }

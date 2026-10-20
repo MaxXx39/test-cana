@@ -123,9 +123,8 @@ export default function App() {
   const troncon = projet.troncons[index];
   const resultats = useMemo(() => calculProjet(projet), [projet]);
 
-  /** Pendant un glisser sur la coupe, la largeur automatique attend le relâcher */
-  const majTroncon = (t: Troncon, enCours = false) => {
-    const n = enCours ? t : ajusterLargeur(t);
+  const majTroncon = (t: Troncon) => {
+    const n = ajusterLargeur(t);
     modifier((p) => ({ ...p, troncons: p.troncons.map((x, i) => (i === index ? n : x)) }));
   };
 
@@ -358,8 +357,8 @@ export default function App() {
             onSelect={setSelection}
           />
           <p className="aide aide-coupe">
-            Coupe à l’échelle. Glissez les poignées pour régler largeur, talus, décapage et épaisseurs de couches ; cliquez un tuyau pour le
-            déplacer et ajuster son enrobage.
+            Coupe à l’échelle. Saisissez directement sur la coupe les épaisseurs de couches et de décapage, l’écart entre tuyaux et
+            l’enrobage du tuyau sélectionné (cliquez un tuyau pour le choisir).
           </p>
           <div className="coupe-bas">
             <TronconEditor

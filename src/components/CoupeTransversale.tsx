@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { etatCoupe, filDEauRegard, filDEauTuyau, geometrieTuyaux, largeurFouille, section } from '../calc/engine';
-import { ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
+import { changerEcart, ecartsTuyaux, tuyauxGaucheDroite } from '../calc/projet';
 import type { ModeSaisie, Regard, Reseau, Troncon, Tuyau } from '../calc/types';
-import { arrondir, fmt } from '../utils/format';
+import { fmt } from '../utils/format';
+import { NumberField } from './NumberField';
 
 export type ModeCoupe = 'amont' | 'moyenne' | 'aval';
 
@@ -15,19 +16,10 @@ interface Props {
   /** En saisie par profondeurs, les altitudes ne sont pas affichées */
   saisie: ModeSaisie;
   mode: ModeCoupe;
-  /** enCours : modification pendant un glisser (la largeur automatique est appliquée au relâcher) */
-  onChange: (t: Troncon, enCours?: boolean) => void;
+  onChange: (t: Troncon) => void;
   selection: string | null;
   onSelect: (id: string | null) => void;
 }
-
-type Poignee =
-  | { k: 'largeur' }
-  | { k: 'fruit' }
-  | { k: 'decapage' }
-  | { k: 'position'; id: string }
-  | { k: 'enrobage'; id: string; cote: 'gauche' | 'droite' | 'haut' | 'bas' }
-  | { k: 'couche'; index: number };
 
 interface Mise {
   /** px par mètre */
@@ -65,7 +57,10 @@ function gabarit(largeur: number): Gabarit {
 const PAD = 8;
 const TOP = 70;
 const BAS = 66;
-const PAS_ETIQUETTE = 18;
+const PAS_ETIQUETTE = 26;
+/** Champs de saisie posés sur le dessin */
+const CHAMP_L = 64;
+const CHAMP_H = 22;
 
 function miseEnPage(g: Gabarit, largeurMonde: number, profondeurMax: number): Mise {
   const dispo = g.vbw - 2 * PAD - 2 * g.jauge - g.cote - g.etiq - (g.compact ? 4 : 16);
@@ -92,14 +87,18 @@ interface Etiquette {
   y: number;
   ancreX: number;
   ancreY: number;
+  /** Nom du matériau */
   texte: string;
   /** Classe du matériau, pour la pastille */
   classe: string;
+  /** Épaisseur saisissable (m), ou valeur affichée seulement */
+  epaisseur?: { valeur: number; onChange?: (v: number) => void };
+  /** Valeur affichée à la place d'une épaisseur (ex. aire d'enrobage) */
+  info?: string;
 }
 
 export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mode, onChange, selection, onSelect }: Props) {
   const altitudes = saisie === 'altitudes';
-  const svgRef = useRef<SVGSVGElement>(null);
   // Les découpes dépendent de l'échelle : identifiants propres à chaque coupe affichée
   const idBase = `coupe${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const boiteRef = useRef<HTMLDivElement>(null);
@@ -113,8 +112,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   }, []);
   const gab = gabarit(largeurBoite);
   const { vbw: VBW, jauge: JAUGE } = gab;
-  const drag = useRef<Poignee | null>(null);
-  const [gel, setGel] = useState<(Mise & { vbw: number }) | null>(null);
 
   const reseau = (id: string) => reseaux.find((r) => r.id === id);
   const couleur = (id: string) => reseau(id)?.couleur ?? 'var(--texte-2)';
@@ -139,8 +136,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
   const profRegards = [amont, aval].flatMap((r) => reseauxRegard.map((x) => r.tn - filDEauRegard(r, x.id)));
   const largeurMonde = Math.max(Wt, ...geoms.map((g) => 2 * Math.max(Math.abs(g.bloc.x0), Math.abs(g.bloc.x1)))) * 1.25 + 0.3;
   const profondeurMax = Math.max(H1, H2, H, 0.5, ...profRegards) + 0.25;
-  const calcul = miseEnPage(gab, largeurMonde, profondeurMax);
-  const m = gel ?? calcul;
+  const m = miseEnPage(gab, largeurMonde, profondeurMax);
   const { s, cx } = m;
 
   const X = (x: number) => cx + x * s;
@@ -156,7 +152,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     16 +
     reseauxRegard.length * LIGNE_FE +
     (gab.compact ? 4 : 20);
-  const vbh = Math.max(m.vbh, calcul.vbh, basJauges);
+  const vbh = Math.max(m.vbh, basJauges);
 
   const poly = (pts: number[][]) => pts.map((p) => p.join(',')).join(' ');
   const tranchee = poly([
@@ -184,87 +180,18 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
       [X(-hw(z2)), Yz(z2)],
     ]);
 
-  // ----- Interaction -----
-  const versMonde = (e: ReactPointerEvent) => {
-    const svg = svgRef.current!;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const p = pt.matrixTransform(svg.getScreenCTM()!.inverse());
-    return { x: (p.x - cx) / s, z: (p.y - TOP) / s };
-  };
+  // ----- Saisie sur la coupe -----
+  const majTuyau = (id: string, maj: (p: Tuyau) => Tuyau) => onChange({ ...t, tuyaux: t.tuyaux.map((p) => (p.id === id ? maj(p) : p)) });
+  const majEnrobage = (id: string, cote: keyof Tuyau['enrobage'], v: number) =>
+    majTuyau(id, (p) => ({ ...p, enrobage: { ...p.enrobage, [cote]: Math.max(0, v) } }));
+  const majCouche = (i: number, v: number) =>
+    onChange({ ...t, couches: t.couches.map((c, j) => (j === i ? { ...c, epaisseur: Math.max(0, v) } : c)) });
 
-  const majTuyau = (id: string, maj: (p: Tuyau) => Tuyau) =>
-    onChange({ ...t, tuyaux: t.tuyaux.map((p) => (p.id === id ? maj(p) : p)) }, true);
-
-  const surDeplacement = (e: ReactPointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const { x, z } = versMonde(e);
-    const y = H - z;
-    const cmArrondi = (v: number) => Math.max(0, arrondir(v, 0.01));
-    switch (d.k) {
-      case 'largeur':
-        onChange({ ...t, largeur: Math.max(0.1, arrondir(2 * Math.abs(x), 0.01)), largeurAuto: false }, true);
-        break;
-      case 'fruit':
-        onChange({ ...t, fruit: Math.max(0, arrondir((Math.abs(x) - W / 2) / H, 0.05)) }, true);
-        break;
-      case 'decapage':
-        onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0.01, Math.min(H, arrondir(z, 0.01))) } }, true);
-        break;
-      case 'position':
-        majTuyau(d.id, (p) => ({ ...p, position: arrondir(x, 0.01) }));
-        break;
-      case 'enrobage': {
-        const g = geoms.find((q) => q.tuyau.id === d.id);
-        if (!g) return;
-        majTuyau(d.id, (p) => {
-          const e2 = { ...p.enrobage };
-          if (d.cote === 'gauche') e2.gauche = cmArrondi(g.cx - g.r - x);
-          if (d.cote === 'droite') e2.droite = cmArrondi(x - g.cx - g.r);
-          if (d.cote === 'haut') e2.haut = cmArrondi(y - (g.cy + g.r));
-          if (d.cote === 'bas') e2.bas = cmArrondi(z - (tn - filDEauTuyau(p, amont, aval, u)) - p.paroi);
-          return { ...p, enrobage: e2 };
-        });
-        break;
-      }
-      case 'couche': {
-        const debut = t.couches.slice(0, d.index).reduce((a, c) => a + c.epaisseur, 0);
-        const couches = t.couches.map((c, i) => (i === d.index ? { ...c, epaisseur: Math.max(0.01, arrondir(z - debut, 0.01)) } : c));
-        onChange({ ...t, couches }, true);
-        break;
-      }
-    }
-  };
-
-  const demarrer = (p: Poignee) => (e: ReactPointerEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    svgRef.current?.setPointerCapture(e.pointerId);
-    drag.current = p;
-    setGel({ ...calcul, vbw: VBW });
-    if (p.k === 'position' || p.k === 'enrobage') onSelect(p.id);
-  };
-
-  const terminer = () => {
-    // Fin de glisser : la modification est validée (largeur automatique appliquée)
-    if (drag.current) onChange(t);
-    drag.current = null;
-    setGel(null);
-  };
-
-  /** Poignée : un rond pour les cotes horizontales, une barrette pour les épaisseurs */
-  const poignee = (p: Poignee, px: number, py: number, titre: string, sens: 'h' | 'v' = 'h', active = false) => (
-    <g className={`poignee poignee-${sens} ${active ? 'poignee-active' : ''}`} onPointerDown={demarrer(p)}>
-      <title>{titre}</title>
-      <circle cx={px} cy={py} r={14} className="poignee-zone" />
-      {sens === 'v' ? (
-        <rect x={px - 9} y={py - 3.5} width={18} height={7} rx={3.5} className="poignee-point" />
-      ) : (
-        <circle cx={px} cy={py} r={5.5} className="poignee-point" />
-      )}
-    </g>
+  /** Champ numérique en cm posé sur le dessin, centré en (x, y) */
+  const champ = (cle: string, x: number, y: number, valeur: number, maj: (v: number) => void, titre: string, classe = ''): ReactNode => (
+    <foreignObject key={cle} x={x - CHAMP_L / 2} y={y - CHAMP_H / 2} width={CHAMP_L} height={CHAMP_H} className="champ-coupe">
+      <NumberField value={valeur} onChange={maj} echelle={100} decimales={1} unite="cm" min={0} pas={1} title={titre} className={`nf-coupe ${classe}`} />
+    </foreignObject>
   );
 
   // ----- Étiquettes -----
@@ -274,21 +201,28 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     const e = Math.min(t.decapage.epaisseur, H);
     etiquettes.push({
       ...zVers(e / 2),
-      texte: `Décapage ${t.surface === 'enrobe' ? 'enrobé' : 'terre'} · ${cm(t.decapage.epaisseur)} cm`,
+      texte: `Décapage ${t.surface === 'enrobe' ? 'enrobé' : 'terre'}`,
       classe: 'et-decapage',
+      epaisseur: { valeur: t.decapage.epaisseur, onChange: (v) => onChange({ ...t, decapage: { ...t.decapage, epaisseur: Math.max(0, v) } }) },
     });
   }
   sec.bornesCouches.forEach(([z1, z2], i) => {
     if (z2 <= z1) return;
-    etiquettes.push({ ...zVers((z1 + z2) / 2), texte: `${t.couches[i].nom} · ${cm(t.couches[i].epaisseur)} cm`, classe: `et-couche-${i % 6}` });
+    etiquettes.push({
+      ...zVers((z1 + z2) / 2),
+      texte: t.couches[i].nom,
+      classe: `et-couche-${i % 6}`,
+      epaisseur: { valeur: t.couches[i].epaisseur, onChange: (v) => majCouche(i, v) },
+    });
   });
   const zBasStructure = sec.bornesCouches.length ? Math.max(...sec.bornesCouches.map((b) => b[1])) : 0;
   const zHautEnrobage = H - sec.hautEnrobage;
   if (zHautEnrobage - zBasStructure > 0.005) {
     etiquettes.push({
       ...zVers((zBasStructure + zHautEnrobage) / 2),
-      texte: `${t.remblaiNom} · ${cm(zHautEnrobage - zBasStructure)} cm`,
+      texte: t.remblaiNom,
       classe: 'et-remblai',
+      epaisseur: { valeur: zHautEnrobage - zBasStructure },
     });
   }
   // Les tuyaux portent leur nom sur le dessin ; leur détail est listé sous la coupe, de gauche à droite.
@@ -300,7 +234,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
       y: Yy(ym),
       ancreX: X(Math.min(droite, hw(H - ym))),
       ancreY: Yy(ym),
-      texte: `Enrobage · ${fmt(sec.enrobage, 3)} m²/ml`,
+      texte: 'Enrobage',
+      info: `${fmt(sec.enrobage, 3)} m²/ml`,
       classe: 'et-enrobage',
     });
   }
@@ -386,7 +321,9 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     );
   };
 
-  const selectionne = geoms.find((g) => g.tuyau.id === selection);
+  // Tuyau dont l'enrobage est saisi sur la coupe : le sélectionné, sinon le plus à gauche
+  const selectionne = geoms.find((g) => g.tuyau.id === selection) ?? [...geoms].sort((a, b) => a.cx - b.cx)[0];
+  const idSel = selectionne?.tuyau.id ?? null;
 
   // Nom du réseau dans le tuyau s'il y tient, sinon au-dessus, à condition de ne pas
   // chevaucher un autre nom (sinon la couleur et la liste sous la coupe suffisent).
@@ -410,19 +347,33 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
     }
   }
 
+  /** Les quatre épaisseurs d'enrobage d'un tuyau, saisies autour de son bloc */
+  const enrobageSurCoupe = (g: (typeof geoms)[number]) => {
+    const { bloc, cx: gx, cy: gy, r } = g;
+    const id = g.tuyau.id;
+    const nom = reseau(g.tuyau.reseau)?.nom ?? '';
+    const yHaut = Math.min(bloc.y1, H);
+    const bandeHaut = (yHaut - (gy + r)) * s;
+    const bandeBas = (gy - r - bloc.y0) * s;
+    const bandeG = (gx - r - bloc.x0) * s;
+    const bandeD = (bloc.x1 - (gx + r)) * s;
+    const yH = bandeHaut >= CHAMP_H + 2 ? Yy((gy + r + yHaut) / 2) : Yy(yHaut) - CHAMP_H / 2 - 2;
+    const yB = bandeBas >= CHAMP_H + 2 ? Yy((bloc.y0 + gy - r) / 2) : Yy(bloc.y0) + CHAMP_H / 2 + 2;
+    const xG = bandeG >= CHAMP_L + 2 ? X((bloc.x0 + gx - r) / 2) : X(bloc.x0) - CHAMP_L / 2 - 2;
+    const xD = bandeD >= CHAMP_L + 2 ? X((gx + r + bloc.x1) / 2) : X(bloc.x1) + CHAMP_L / 2 + 2;
+    return (
+      <g className="enrobage-saisie">
+        {champ(`eh-${id}`, X(gx), yH, g.tuyau.enrobage.haut, (v) => majEnrobage(id, 'haut', v), `Enrobage haut ${nom}`, 'nf-enrobage')}
+        {champ(`eb-${id}`, X(gx), yB, g.tuyau.enrobage.bas, (v) => majEnrobage(id, 'bas', v), `Enrobage bas (lit de pose) ${nom}`, 'nf-enrobage')}
+        {champ(`eg-${id}`, xG, Yy(gy), g.tuyau.enrobage.gauche, (v) => majEnrobage(id, 'gauche', v), `Enrobage gauche ${nom}`, 'nf-enrobage')}
+        {champ(`ed-${id}`, xD, Yy(gy), g.tuyau.enrobage.droite, (v) => majEnrobage(id, 'droite', v), `Enrobage droit ${nom}`, 'nf-enrobage')}
+      </g>
+    );
+  };
+
   return (
     <div ref={boiteRef} className="coupe-boite">
-      <svg
-        ref={svgRef}
-        className="coupe"
-        viewBox={`0 0 ${gel?.vbw ?? VBW} ${vbh}`}
-        role="img"
-        aria-label="Coupe transversale de la tranchée"
-        onPointerMove={surDeplacement}
-        onPointerUp={terminer}
-        onPointerCancel={terminer}
-        onPointerDown={() => onSelect(null)}
-      >
+      <svg className="coupe" viewBox={`0 0 ${VBW} ${vbh}`} role="group" aria-label="Coupe transversale de la tranchée">
         <defs>
           <clipPath id={`${idBase}-fouille`}>
             <polygon points={tranchee} />
@@ -460,7 +411,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               y={Yy(Math.min(g.bloc.y1, H))}
               width={(g.bloc.x1 - g.bloc.x0) * s}
               height={Math.max(0, Math.min(g.bloc.y1, H) - g.bloc.y0) * s}
-              className={`enrobage ${g.tuyau.id === selection ? 'enrobage-sel' : ''}`}
+              className={`enrobage ${g.tuyau.id === idSel ? 'enrobage-sel' : ''}`}
             />
           ))}
           {geoms.map((g) => (
@@ -518,15 +469,15 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
         {/* Tuyaux, à la couleur de leur réseau */}
         {geoms.map((g) => {
           const ep = Math.max(3, g.tuyau.paroi * s);
-          const sel = g.tuyau.id === selection;
+          const sel = g.tuyau.id === idSel;
           return (
             <g
               key={g.tuyau.id}
               className={`tuyau ${sel ? 'tuyau-sel' : ''}`}
               style={{ color: couleur(g.tuyau.reseau) }}
-              onPointerDown={demarrer({ k: 'position', id: g.tuyau.id })}
+              onClick={() => onSelect(g.tuyau.id)}
             >
-              <title>{`${reseau(g.tuyau.reseau)?.nom ?? ''} Ø${fmt(g.tuyau.diametre * 1000, 0)} — glisser pour déplacer`}</title>
+              <title>{`${reseau(g.tuyau.reseau)?.nom ?? ''} Ø${fmt(g.tuyau.diametre * 1000, 0)} — cliquer pour saisir son enrobage`}</title>
               {sel && <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s + 4} className="tuyau-halo" />}
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={g.r * s} className="tuyau-paroi" />
               <circle cx={X(g.cx)} cy={Yy(g.cy)} r={Math.max(1, g.r * s - ep)} className="tuyau-int" />
@@ -558,10 +509,10 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           >
             H = {fmt(H, 2)} m
           </text>
-          <line x1={X(-W / 2)} x2={X(W / 2)} y1={Yy(0) + 20} y2={Yy(0) + 20} />
-          <line x1={X(-W / 2)} x2={X(-W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 26} />
-          <line x1={X(W / 2)} x2={X(W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 26} />
-          <text x={X(0)} y={Yy(0) + 38} textAnchor="middle" className="cote-texte">
+          <line x1={X(-W / 2)} x2={X(W / 2)} y1={Yy(0) + 32} y2={Yy(0) + 32} />
+          <line x1={X(-W / 2)} x2={X(-W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 38} />
+          <line x1={X(W / 2)} x2={X(W / 2)} y1={Yy(0) + 4} y2={Yy(0) + 38} />
+          <text x={X(0)} y={Yy(0) + 50} textAnchor="middle" className="cote-texte">
             {epBlindage <= 0
               ? `${fmt(W, 2)} m`
               : gab.compact
@@ -573,7 +524,6 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
             const ga = geoms.find((g) => g.tuyau.id === tries[i].id)!;
             const gb = geoms.find((g) => g.tuyau.id === b.id)!;
             const e = ecarts[i + 1];
-            if (e < 0.005) return null;
             const x1 = X(ga.cx + ga.r);
             const x2 = X(gb.cx - gb.r);
             const y = Yy(Math.min(ga.cy, gb.cy));
@@ -585,11 +535,16 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
                 <line x1={x1} x2={x2} y1={y} y2={y} />
                 <line x1={x1} x2={x1} y1={y - 4} y2={y + 4} />
                 <line x1={x2} x2={x2} y1={y - 4} y2={y + 4} />
-                {x2 - x1 > 22 && (
-                  <text x={(x1 + x2) / 2} y={y - 4} textAnchor="middle" className="cote-ecart-texte">
-                    {cm(e)}
-                  </text>
-                )}
+                {!gab.compact &&
+                  champ(
+                    `ecart-${b.id}`,
+                    (x1 + x2) / 2,
+                    y - CHAMP_H / 2 - 3,
+                    e,
+                    (v) => onChange(changerEcart(t, b.id, v)),
+                    `Écart nu à nu entre ${reseau(tries[i].reseau)?.nom} et ${reseau(b.reseau)?.nom}`,
+                    'nf-ecart',
+                  )}
               </g>
             );
           })}
@@ -612,7 +567,14 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               <polyline points={`${e.ancreX + 2},${e.ancreY} ${m.xEtiquettes - 8},${e.y} ${m.xEtiquettes - 2},${e.y}`} className="etiquette-trait" />
               <circle cx={e.ancreX + 2} cy={e.ancreY} r={2} className="etiquette-point" />
               <rect x={m.xEtiquettes} y={e.y - 5} width={10} height={10} rx={2} className={`etiquette-pastille ${e.classe}`} />
-              <text x={m.xEtiquettes + 16} y={e.y + 4} className="etiquette-texte">
+              {e.epaisseur?.onChange ? (
+                champ(`et-${i}`, m.xEtiquettes + 16 + CHAMP_L / 2, e.y, e.epaisseur.valeur, e.epaisseur.onChange, `Épaisseur : ${e.texte}`)
+              ) : (
+                <text x={m.xEtiquettes + 16 + CHAMP_L - 6} y={e.y + 4} textAnchor="end" className="etiquette-valeur">
+                  {e.epaisseur ? `${fmt(e.epaisseur.valeur * 100, 1)} cm` : e.info}
+                </text>
+              )}
+              <text x={m.xEtiquettes + 22 + CHAMP_L} y={e.y + 4} className="etiquette-texte">
                 {e.texte}
               </text>
             </g>
@@ -626,24 +588,8 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           </text>
         </g>
 
-        {/* Poignées */}
-        {poignee({ k: 'largeur' }, X(W / 2), Yy(0), 'Largeur de tranchée en fond (glisser)')}
-        {t.type === 'V' && poignee({ k: 'fruit' }, X(W / 2 + f * H), Yy(H), 'Pente de talus (glisser)')}
-        {t.decapage.actif &&
-          poignee({ k: 'decapage' }, X(hw(t.decapage.epaisseur)) - 16, Yz(Math.min(t.decapage.epaisseur, H)), 'Épaisseur de décapage (glisser)', 'v')}
-        {sec.bornesCouches.map(([, z2], i) => {
-          const zBrut = t.couches.slice(0, i + 1).reduce((a, c) => a + c.epaisseur, 0);
-          if (zBrut > z2 + 1e-9) return null;
-          return <g key={t.couches[i].id}>{poignee({ k: 'couche', index: i }, X(-hw(z2)) + 16, Yz(z2), `Épaisseur « ${t.couches[i].nom} » (glisser)`, 'v')}</g>;
-        })}
-        {selectionne && (
-          <>
-            {poignee({ k: 'enrobage', id: selectionne.tuyau.id, cote: 'gauche' }, X(selectionne.bloc.x0), Yy(selectionne.cy), 'Enrobage gauche (glisser)', 'h', true)}
-            {poignee({ k: 'enrobage', id: selectionne.tuyau.id, cote: 'droite' }, X(selectionne.bloc.x1), Yy(selectionne.cy), 'Enrobage droit (glisser)', 'h', true)}
-            {poignee({ k: 'enrobage', id: selectionne.tuyau.id, cote: 'haut' }, X(selectionne.cx), Yy(Math.min(selectionne.bloc.y1, H)), 'Enrobage haut (glisser)', 'v', true)}
-            {poignee({ k: 'enrobage', id: selectionne.tuyau.id, cote: 'bas' }, X(selectionne.cx), Yy(selectionne.bloc.y0), 'Enrobage bas / lit de pose (glisser)', 'v', true)}
-          </>
-        )}
+        {/* Enrobage du tuyau sélectionné, saisi sur la coupe */}
+        {selectionne && !gab.compact && enrobageSurCoupe(selectionne)}
       </svg>
       {tuyauxListe.length > 0 && (
         <ul className="liste-reseaux-coupe" aria-label="Tuyaux de la coupe, de gauche à droite">
@@ -653,7 +599,7 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
               <li key={g.tuyau.id}>
                 <button
                   type="button"
-                  className={g.tuyau.id === selection ? 'actif' : ''}
+                  className={g.tuyau.id === idSel ? 'actif' : ''}
                   style={{ '--pastille': couleur(g.tuyau.reseau) } as CSSProperties}
                   onClick={() => onSelect(g.tuyau.id)}
                 >
@@ -669,10 +615,57 @@ export function CoupeTransversale({ troncon: t, amont, aval, reseaux, saisie, mo
           })}
         </ul>
       )}
+      {gab.compact && selectionne && (
+        <div className="saisie-tuyau" style={{ '--pastille': couleur(selectionne.tuyau.reseau) } as CSSProperties}>
+          <strong>
+            {reseau(selectionne.tuyau.reseau)?.nom} Ø{fmt(selectionne.tuyau.diametre * 1000, 0)}
+          </strong>
+          <span>enrobage</span>
+          {(['haut', 'bas', 'gauche', 'droite'] as const).map((c) => (
+            <label key={c} className="saisie-tuyau-champ">
+              {c === 'bas' ? 'bas (lit)' : c}
+              <NumberField
+                value={selectionne.tuyau.enrobage[c]}
+                onChange={(v) => majEnrobage(selectionne.tuyau.id, c, v)}
+                echelle={100}
+                decimales={1}
+                unite="cm"
+                min={0}
+                pas={1}
+                className="nf-coupe"
+              />
+            </label>
+          ))}
+          {(() => {
+            const k = tries.findIndex((x) => x.id === selectionne.tuyau.id);
+            if (k <= 0) return null;
+            return (
+              <label className="saisie-tuyau-champ">
+                écart avec {reseau(tries[k - 1].reseau)?.nom}
+                <NumberField
+                  value={ecarts[k]}
+                  onChange={(v) => onChange(changerEcart(t, selectionne.tuyau.id, v))}
+                  echelle={100}
+                  decimales={1}
+                  unite="cm"
+                  min={0}
+                  pas={1}
+                  className="nf-coupe nf-ecart"
+                />
+              </label>
+            );
+          })()}
+        </div>
+      )}
       {gab.compact && (
         <ul className="legende">
           {etiquettes.map((e, i) => (
             <li key={i} className={e.classe}>
+              {e.epaisseur?.onChange ? (
+                <NumberField value={e.epaisseur.valeur} onChange={e.epaisseur.onChange} echelle={100} decimales={1} unite="cm" min={0} pas={1} className="nf-coupe" />
+              ) : (
+                <span className="legende-valeur">{e.epaisseur ? `${fmt(e.epaisseur.valeur * 100, 1)} cm` : e.info}</span>
+              )}
               {e.texte}
             </li>
           ))}
